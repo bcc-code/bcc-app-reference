@@ -34,7 +34,9 @@ public static class FrontendConfiguration
     {
         var options = app.Configuration.GetSection("Frontend").Get<FrontendOptions>() ?? new FrontendOptions();
         if (options.Mode != FrontendMode.Static || options.StaticPath is null) return;   // no path: the document build
-        app.UseStaticFiles(new StaticFileOptions
+        // Static files run before authentication. index.html must only come from IndexHtmlMiddleware, which requires a session
+        // and adds the CSP nonce, so the file itself is never served from here.
+        app.UseWhen(context => !IsIndexHtml(context.Request.Path), branch => branch.UseStaticFiles(new StaticFileOptions
         {
             FileProvider = new PhysicalFileProvider(Path.GetFullPath(options.StaticPath!)),
             OnPrepareResponse = ctx =>
@@ -42,8 +44,11 @@ public static class FrontendConfiguration
                 if (ctx.Context.Request.Path.StartsWithSegments("/assets"))
                     ctx.Context.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
             },
-        });
+        }));
     }
+
+    // Case-insensitive: the file system of a developer machine may be, and the request must not reach the file by another spelling.
+    private static bool IsIndexHtml(PathString path) => path.Equals("/index.html", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>After authentication, before authorization: the shell redirects to sign-in itself.</summary>
     public static void UseTemplateIndexHtml(this WebApplication app) => app.UseMiddleware<IndexHtmlMiddleware>();

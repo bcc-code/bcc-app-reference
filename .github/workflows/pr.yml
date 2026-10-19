@@ -54,7 +54,7 @@ jobs:
   # Both persistence variants (Marten and EF Core) are built and tested while the template has both; after
   # scripts/init-app.ps1 only the chosen one remains in the solution.
   # Debug on purpose: Release has no Roslyn for Wolverine's dynamic code generation, so the API tests need Debug. Release is
-  # built, with pre-generated code, by deploy.yml. Debug builds of an API project also write api/openapi/openapi.json.
+  # built with pre-generated code in the last step below. Debug builds of an API project also write api/openapi/openapi.json.
   backend:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
@@ -75,6 +75,18 @@ jobs:
           for project in api/BccCode.Template.Api*/; do   # every persistence variant; one project after init-app.ps1
             dotnet build "$project" --no-incremental
             git diff --exit-code api/openapi/openapi.json
+          done
+      # The images run Release with Wolverine's pre-generated code (deploy.yml, preview.yml). Generate it for every variant and
+      # compile Release, so a handler that code generation cannot handle fails here instead of in a deploy. The settings
+      # only let the host build; nothing connects to a database.
+      - name: Wolverine pre-generated code compiles in Release
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ConnectionStrings__template: Host=localhost;Database=x
+        run: |
+          for project in api/BccCode.Template.Api*/; do
+            dotnet run --project "$project" --configuration Debug --no-build -- codegen write
+            dotnet build "$project" --configuration Release
           done
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

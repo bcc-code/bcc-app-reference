@@ -111,8 +111,7 @@ jobs:
       # One frontend build for every environment: runtime settings come from the API, not from the bundle (standard 06 rule 3).
       - run: pnpm --dir frontend run build
       # index.html is served by the API (with the CSP nonce); only the hashed bundles go to the bucket (standard 26 rule 2).
-      # TODO: the output folder (frontend/dist) and the wwwroot location must match what the API serves. Check against
-      # the API project when the template is first deployed.
+      # The API reads it from /app/wwwroot in the image (Frontend__StaticPath in infra/cloudrun_api.tf).
       - name: Bake index.html into the image
         run: mkdir -p "$API_PROJECT/wwwroot" && cp frontend/dist/index.html "$API_PROJECT/wwwroot/index.html"
       # The image runs Wolverine with pre-generated code: Release builds have no Roslyn to compile handlers at startup, and the

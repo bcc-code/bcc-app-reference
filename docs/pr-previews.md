@@ -54,10 +54,11 @@ never checks out PR code. To destroy an orphan by hand: Actions, PR preview, Run
 ## Security
 
 The label decides whether the pipeline builds an environment. **It is not a security boundary.** Preview jobs run PR code in
-the GitHub environment `preview` with a service account that can create Cloud Run services and service accounts in the sandbox
-project. Anyone who can open a PR in the repository can run a workflow as that account, with or without this feature. The
-account exists in sandbox only and is bound to the environment name `preview` (`infra/iam.tf`). Scope it further with IAM
-conditions when previews are adopted.
+the GitHub environment `preview` with a service account that has `roles/run.admin` in the sandbox project, so it can create,
+change and delete any Cloud Run service there. It can act only as the shared preview runtime account, not as other service
+accounts. Anyone who can open a PR in the repository can run a workflow as that account, with or without this feature. The
+account exists in sandbox only and is bound to the environment name `preview` (`infra/iam.tf`). Scope `run.admin` further with
+IAM conditions when previews are adopted.
 
 ## Troubleshooting
 

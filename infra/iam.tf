@@ -220,9 +220,10 @@ resource "google_project_iam_member" "plan_security_reviewer" {
 # --- Preview environments (sandbox only, standard 07) ---------------------------------------------------------------------
 
 # Previews run PR code, so this account is bound to its own GitHub environment "preview" (which has no branch restriction)
-# and exists in sandbox only. KNOWN RISK: it can create service accounts and Cloud Run services in the sandbox project, and
-# anyone who can open a PR in the repository can run a job as it. Sandbox holds generated test data only. Narrow it with IAM
-# conditions when previews are adopted (standard 07 rule 21).
+# and exists in sandbox only. Anyone who can open a PR can run a job as it, so it gets no IAM administration: it cannot
+# create service accounts or change their policies, and it can act as one account only, the shared preview runtime account
+# below. It can still create and delete Cloud Run services and jobs in the sandbox project (run.admin), which holds
+# generated test data only (standard 07 rule 21).
 resource "google_service_account" "preview" {
   count        = local.env == "sandbox" ? 1 : 0
   account_id   = "sa-${local.app}-preview-${local.env}"
@@ -238,8 +239,7 @@ resource "google_service_account_iam_member" "preview_wif" {
 
 resource "google_project_iam_member" "preview" {
   for_each = local.env == "sandbox" ? toset([
-    "roles/run.admin",               # create and delete the per-PR services and jobs
-    "roles/iam.serviceAccountAdmin", # create and delete the per-PR runtime account
+    "roles/run.admin", # create and delete the per-PR services and jobs
     "roles/serviceusage.serviceUsageConsumer",
   ]) : toset([])
   project = var.project_id
@@ -247,17 +247,22 @@ resource "google_project_iam_member" "preview" {
   member  = "serviceAccount:${google_service_account.preview[0].email}"
 }
 
-# Acting as the per-PR runtime accounts only: the condition limits the project-wide binding to accounts named sa-<app>-pr<N>
-# (standard 03 rule 13: serviceAccountUser must not be granted project-wide without a limit).
-resource "google_project_iam_member" "preview_acts_as_pr_accounts" {
-  count   = local.env == "sandbox" ? 1 : 0
-  project = var.project_id
-  role    = "roles/iam.serviceAccountUser"
-  member  = "serviceAccount:${google_service_account.preview[0].email}"
-  condition {
-    title      = "only-preview-runtime-accounts"
-    expression = "resource.name.startsWith(\"projects/${var.project_id}/serviceAccounts/sa-${local.app}-pr\")"
-  }
+# The identity every preview runs as. One shared account instead of one per PR: creating accounts per PR needs
+# iam.serviceAccountAdmin, which would let PR code change the IAM policy of every account in the project, the Terraform
+# accounts included. Give it only what the preview runtime needs; previews share it, so they must not hold secrets that
+# differ per PR.
+resource "google_service_account" "preview_runtime" {
+  count        = local.env == "sandbox" ? 1 : 0
+  account_id   = "sa-${local.app}-preview-run"
+  display_name = "${local.app} PR preview runtime (${local.env})"
+}
+
+# Acting as the preview runtime account only, granted on that account rather than on the project (standard 03 rule 13).
+resource "google_service_account_iam_member" "preview_acts_as_runtime" {
+  count              = local.env == "sandbox" ? 1 : 0
+  service_account_id = google_service_account.preview_runtime[0].name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.preview[0].email}"
 }
 
 resource "google_artifact_registry_repository_iam_member" "preview_writer" {

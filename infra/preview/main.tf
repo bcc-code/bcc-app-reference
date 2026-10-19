@@ -20,9 +20,10 @@ provider "google" {
   region  = var.region
 }
 
-resource "google_service_account" "api" {
-  account_id   = "sa-template-${local.slug}"
-  display_name = "template preview ${local.slug}"
+# Created once by ../iam.tf (preview_runtime). The preview workflow may act as this account and no other, so a preview cannot
+# run as the sandbox API or the Terraform accounts.
+data "google_service_account" "runtime" {
+  account_id = "sa-template-preview-run"
 }
 
 resource "google_cloud_run_v2_service" "api" {
@@ -36,7 +37,7 @@ resource "google_cloud_run_v2_service" "api" {
   ingress = "INGRESS_TRAFFIC_ALL"
 
   template {
-    service_account = google_service_account.api.email
+    service_account = data.google_service_account.runtime.email
     labels          = local.labels
     scaling {
       min_instance_count = 0 # previews scale to zero (standard 07 rule 9)
@@ -45,6 +46,11 @@ resource "google_cloud_run_v2_service" "api" {
     containers {
       name  = "app"
       image = var.api_image
+      # preview.yml bakes the built frontend into wwwroot; see ../cloudrun_api.tf.
+      env {
+        name  = "Frontend__StaticPath"
+        value = "/app/wwwroot"
+      }
       ports {
         container_port = 8080
       }

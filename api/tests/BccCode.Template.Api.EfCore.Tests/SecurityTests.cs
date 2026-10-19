@@ -106,6 +106,20 @@ public class SecurityTests(AppFixture app)
     }
 
     [Fact]
+    public async Task The_built_index_html_is_never_served_as_a_static_file()
+    {
+        // The shell must come from the middleware that requires a session and adds the CSP nonce. Served as a file, it would
+        // skip both. Without a session the default-deny policy sends the browser to sign-in; with one, a path with an extension
+        // is not a client-side route, so it is not found.
+        foreach (var path in new[] { "/index.html", "/INDEX.HTML" })
+        {
+            var anonymous = await Host.Scenario(s => { s.Get.Url(path); s.WithRequestHeader("Accept", "text/html"); s.StatusCodeShouldBe(302); });
+            new Uri(anonymous.Context.Response.Headers.Location.ToString()).AbsolutePath.Should().Be("/user/login");
+        }
+        await Host.Scenario(s => { s.As(TestUser.New()); s.Get.Url("/index.html"); s.WithRequestHeader("Accept", "text/html"); s.StatusCodeShouldBe(404); });
+    }
+
+    [Fact]
     public void The_database_check_is_in_health_and_not_in_alive()
     {
         var registrations = Host.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<HealthCheckServiceOptions>>().Value.Registrations;

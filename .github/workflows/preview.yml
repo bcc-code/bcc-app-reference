@@ -172,6 +172,15 @@ jobs:
       # if the API does so. Decide whether previews use the bucket or a copy inside the image.
       - name: Bake index.html into the image
         run: mkdir -p "$API_PROJECT/wwwroot" && cp -r frontend/dist/. "$API_PROJECT/wwwroot/"
+      # Same as deploy.yml: the Release image asserts that Wolverine's pre-generated code exists and fails at startup without
+      # it. The settings only let the host build; nothing connects to a database.
+      - name: Pre-generate the Wolverine code
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ConnectionStrings__template: Host=localhost;Database=x
+        run: |
+          dotnet build "$API_PROJECT" --configuration Debug
+          dotnet run --project "$API_PROJECT" --configuration Debug --no-build -- codegen write
       - id: push
         name: Publish the container image
         run: |

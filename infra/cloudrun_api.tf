@@ -10,6 +10,10 @@ locals {
     ConnectionStrings__template   = local.db_connection_string
     OIDC__Authority               = var.oidc_authority
     OIDC__ClientId                = var.oidc_client_id
+    # deploy.yml bakes index.html into the API project's wwwroot, which the .NET SDK image puts under its working directory
+    # /app. The host requires the path in Static mode (the default outside Development) and fails at startup without it;
+    # the migration job runs the same host, so it needs it too.
+    Frontend__StaticPath = "/app/wwwroot"
     # Required by standard 22 rule 2. No OTLP endpoint is set: under request-based billing spans are best effort and
     # alerting depends on metrics and logs only (docs/runbooks/README.md).
     OTEL_SERVICE_NAME        = "${local.app}-api"
