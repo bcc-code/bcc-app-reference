@@ -1,0 +1,12 @@
+{
+  "browser": {
+    "launchOptions": {
+      "args": ["--lang=nb"]
+    },
+    "contextOptions": {
+      "locale": "nb-NO",
+      "timezoneId": "Europe/Oslo",
+      "ignoreHTTPSErrors": true
+    }
+  }
+}

@@ -1,0 +1,137 @@
+name: Infrastructure
+
+# - Pull requests that touch infra/ get a read-only plan against sandbox, written to the job summary.
+# - deploy.yml calls this workflow to apply sandbox before every rollout, so Terraform and the deploy cannot race
+#   (standard 03 rule 8, standard 06 rule 10).
+# - Prod is applied by hand: Actions, Infrastructure, Run workflow, environment prod (required reviewers apply).
+#
+# Terraform runs from CI only, apart from the one-time bootstrap in infra/README.md (standard 03 rule 4).
+on:
+  pull_request:
+    branches: [main]
+    paths: ['infra/**', '.github/workflows/infra.yml']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to run against
+        type: choice
+        options: [sandbox, prod]
+        default: sandbox
+      action:
+        description: plan only, or plan and apply
+        type: choice
+        options: [plan, apply]
+        default: plan
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      action:
+        type: string
+        default: apply
+      ref:
+        description: Commit to apply
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  TF_IN_AUTOMATION: 'true'
+  TF_INPUT: '0'
+
+jobs:
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: infra-plan-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    env:
+      # Repository-level variables with the sandbox values. The plan account is read-only and bound to the repository,
+      # because pull request jobs have no GitHub environment (infra/README.md, step 4).
+      TF_VARS: ${{ vars.TF_VARS }}
+      STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+    steps:
+      # Forks and Dependabot get no OIDC token; a plan would fail with a confusing error.
+      - name: Check that credentials are available
+        id: can
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          if [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ] || [ "$ACTOR" = "dependabot[bot]" ] || [ -z "$STATE_BUCKET" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No plan: fork, Dependabot or TF_STATE_BUCKET not set. Validation runs in the CI workflow." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.can.outputs.run == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: steps.can.outputs.run == 'true'
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_wrapper: false
+      - if: steps.can.outputs.run == 'true'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_PLAN_SERVICE_ACCOUNT }}
+      - if: steps.can.outputs.run == 'true'
+        name: Plan
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$TF_VARS" > "$RUNNER_TEMP/env.tfvars"
+          terraform -chdir=infra init -backend-config="bucket=$STATE_BUCKET" -backend-config="prefix=template/sandbox"
+          # -lock=false: the plan account may read the state bucket but not write to it.
+          terraform -chdir=infra plan -lock=false -no-color -var-file="$RUNNER_TEMP/env.tfvars" | tee "$RUNNER_TEMP/plan.txt"
+          {
+            echo '### Terraform plan (sandbox)'
+            echo '```'
+            tail -c 60000 "$RUNNER_TEMP/plan.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  apply:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.environment }}
+    # Serialised and never cancelled: cancelling an apply can leave the state locked (standard 05 rule 10).
+    concurrency:
+      group: env-${{ inputs.environment }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_VARS: ${{ vars.TF_VARS }}
+      STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      ENVIRONMENT: ${{ inputs.environment }}
+      ACTION: ${{ inputs.action }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_wrapper: false
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_TERRAFORM_SERVICE_ACCOUNT }}
+      - name: Plan
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$TF_VARS" > "$RUNNER_TEMP/env.tfvars"
+          terraform -chdir=infra init -backend-config="bucket=$STATE_BUCKET" -backend-config="prefix=template/$ENVIRONMENT"
+          terraform -chdir=infra plan -no-color -out="$RUNNER_TEMP/tfplan" -var-file="$RUNNER_TEMP/env.tfvars"
+      - name: Apply
+        if: env.ACTION == 'apply'
+        run: terraform -chdir=infra apply -no-color "$RUNNER_TEMP/tfplan"

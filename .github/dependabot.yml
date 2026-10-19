@@ -1,0 +1,94 @@
+version: 2
+updates:
+  # The npm ecosystem also covers pnpm (it reads frontend/pnpm-lock.yaml). dependabot-guard.yml blocks package-lock.json.
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 15
+    # Matches minimumReleaseAge (10080 minutes = 7 days) and minimumReleaseAgeExclude in frontend/pnpm-workspace.yaml.
+    # Without it Dependabot opens PRs that pnpm then refuses to install.
+    cooldown:
+      default-days: 7
+      exclude:
+        - '@bcc-code/*'
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - dependencies
+    groups:
+      patch-updates:
+        update-types: [patch]
+      minor-dev-deps:
+        dependency-type: development
+        update-types: [minor]
+      major-dev-deps:
+        dependency-type: development
+        update-types: [major]
+
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 15
+    # A short quarantine for new releases. It is not tied to a package manager setting, as the pnpm one is.
+    cooldown:
+      default-days: 3
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  # Keeps the SHA pins of actions and reusable workflows current (standard 05 rule 12).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin
+    cooldown:
+      default-days: 3
+    commit-message:
+      prefix: ci
+      include: scope
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      github-actions:
+        patterns: ['*']
+
+  # Provider versions. The gateway modules are pinned by commit SHA and are updated by hand (infra/gateway_backend.tf).
+  - package-ecosystem: terraform
+    directories:
+      - /infra
+      - /infra/preview
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin
+    cooldown:
+      default-days: 3
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - dependencies
+      - infra
+    groups:
+      terraform:
+        patterns: ['*']

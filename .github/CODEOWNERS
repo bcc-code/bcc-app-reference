@@ -1,0 +1,4 @@
+# TODO: replace with the team that owns this application, for example @bcc-code/your-team.
+# Infrastructure and workflows deserve a second look from someone who knows them.
+/.github/   @OWNER/TODO-team
+/infra/     @OWNER/TODO-team

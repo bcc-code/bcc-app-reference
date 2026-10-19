@@ -1,0 +1,4 @@
+.eslintcache
+playwright-report/
+test-results/
+openapi-ts-error-*.log

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build *)",
+      "Bash(dotnet test *)",
+      "Bash(dotnet format *)",
+      "Bash(pnpm --dir frontend run *)",
+      "Bash(aspire describe *)",
+      "WebFetch(domain:wolverinefx.net)",
+      "WebFetch(domain:martendb.io)",
+      "WebFetch(domain:aspire.dev)"
+    ]
+  }
+}

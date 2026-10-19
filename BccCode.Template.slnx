@@ -1,0 +1,24 @@
+<Solution>
+  <Folder Name="/Application/">
+    <Project Path="api/AppHost/AppHost.csproj" />
+    <Project Path="api/BccCode.Template.Api.EfCore/BccCode.Template.Api.EfCore.csproj" />
+    <Project Path="api/BccCode.Template.Api.Marten/BccCode.Template.Api.Marten.csproj" />
+    <Project Path="api/BccCode.Template.Web/BccCode.Template.Web.csproj" />
+    <Project Path="api/ServiceDefaults/ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="api/tests/BccCode.Template.ArchitectureTests/BccCode.Template.ArchitectureTests.csproj" />
+    <Project Path="api/tests/BccCode.Template.Api.EfCore.Tests/BccCode.Template.Api.EfCore.Tests.csproj" />
+    <Project Path="api/tests/BccCode.Template.Api.Marten.Tests/BccCode.Template.Api.Marten.Tests.csproj" />
+    <Project Path="api/tests/BccCode.Template.Web.Tests/BccCode.Template.Web.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Utils/">
+    <Project Path="api/OidcMock/OidcMock.csproj" />
+  </Folder>
+  <Folder Name="/Files/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path=".editorconfig" />
+  </Folder>
+</Solution>

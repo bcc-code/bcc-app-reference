@@ -1,0 +1,63 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": ["dist", "src/client/**", "playwright-report", "test-results"],
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "vue", "vitest"],
+  "env": {
+    "browser": true
+  },
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "jsPlugins": [
+    { "name": "unicorn-js", "specifier": "eslint-plugin-unicorn" },
+    { "name": "vitest-js", "specifier": "@vitest/eslint-plugin" },
+    { "name": "tanstack-query", "specifier": "@tanstack/eslint-plugin-query" }
+  ],
+  "rules": {
+    "typescript/no-explicit-any": "warn",
+    "eslint/no-console": ["error", { "allow": ["warn", "error"] }],
+
+    "unicorn/no-null": "off",
+    "unicorn/filename-case": "off",
+    "unicorn/no-array-callback-reference": "off",
+    "unicorn/no-await-expression-member": "off",
+    "unicorn/no-array-reduce": "off",
+    "unicorn/no-useless-undefined": "off",
+
+    "tanstack-query/exhaustive-deps": "error",
+    "tanstack-query/no-rest-destructuring": "error",
+    "tanstack-query/stable-query-client": "error",
+    "tanstack-query/no-unstable-deps": "error",
+    "tanstack-query/no-void-query-fn": "error",
+    "tanstack-query/mutation-property-order": "error"
+  },
+  "overrides": [
+    {
+      "files": ["src/**/*.{ts,vue}"],
+      "rules": {
+        "eslint/complexity": ["error", { "max": 10 }],
+        "typescript/consistent-type-assertions": ["warn", { "assertionStyle": "as" }],
+        "unicorn-js/better-regex": "warn",
+        "unicorn-js/custom-error-definition": "error",
+        "unicorn-js/no-unused-properties": "warn",
+        "unicorn-js/consistent-destructuring": "warn"
+      }
+    },
+    {
+      "files": ["**/*.vue"],
+      "rules": {
+        "vue/define-props-destructuring": "warn",
+        "vue/max-props": ["error", { "maxProps": 8 }]
+      }
+    },
+    {
+      "files": ["src/**/*.test.ts", "e2e/**/*.ts"],
+      "rules": {
+        "vitest-js/consistent-test-it": ["error", { "fn": "it" }],
+        "vitest-js/require-top-level-describe": "error",
+        "vitest-js/max-nested-describe": ["error", { "max": 2 }]
+      }
+    }
+  ]
+}

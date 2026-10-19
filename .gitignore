@@ -1,0 +1,23 @@
+bin/
+obj/
+.vs/
+.idea/
+*.user
+TestResults/
+node_modules/
+frontend/dist/
+.eslintcache
+*.env*
+.terraform/
+
+# Wolverine pre-generated code (codegen write) when written to disk
+**/Internal/Generated/
+
+# Claude Code agent worktrees and machine-specific settings
+.claude/worktrees/
+.claude/settings.local.json
+
+# Agent and browser-automation artefacts
+.playwright-mcp/
+.playwright-cli/
+.superpowers/

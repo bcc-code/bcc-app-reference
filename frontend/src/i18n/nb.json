@@ -1,0 +1,70 @@
+{
+  "app": {
+    "title": "Template",
+    "skipToContent": "Hopp til innhold"
+  },
+  "nav": {
+    "label": "Hovedmeny",
+    "notes": "Notater",
+    "stats": "Statistikk"
+  },
+  "user": {
+    "menu": "{name}, kontomeny",
+    "signedInAs": "Logget inn som {name}",
+    "logout": "Logg ut"
+  },
+  "common": {
+    "loading": "Laster…",
+    "back": "Tilbake til notater"
+  },
+  "notes": {
+    "title": "Notater",
+    "new": "Nytt notat",
+    "empty": "Du har ingen notater ennå.",
+    "updated": "Oppdatert {date}",
+    "edit": "Rediger {title}",
+    "archive": "Arkiver {title}",
+    "createTitle": "Nytt notat",
+    "editTitle": "Rediger notat",
+    "reload": "Last inn siste versjon",
+    "form": {
+      "title": "Tittel",
+      "body": "Tekst",
+      "create": "Opprett notat",
+      "save": "Lagre endringer"
+    }
+  },
+  "admin": {
+    "stats": {
+      "title": "Statistikk",
+      "activeNotes": "Aktive notater",
+      "archivedNotes": "Arkiverte notater"
+    }
+  },
+  "noAccess": {
+    "title": "Ingen tilgang",
+    "text": "Kontoen din har ikke tilgang til denne siden.",
+    "home": "Gå til notatene dine"
+  },
+  "notFound": {
+    "title": "Siden finnes ikke",
+    "text": "Siden du leter etter finnes ikke.",
+    "home": "Gå til notatene dine"
+  },
+  "errors": {
+    "unauthorized": "Du er ikke logget inn.",
+    "forbidden": "Du har ikke tilgang til dette.",
+    "notFound": "Vi fant ikke det du ba om.",
+    "conflict": "Noen andre endret dette samtidig. Last inn siste versjon og prøv igjen.",
+    "validation": "Noen av verdiene er ikke gyldige.",
+    "csrf": "Siden har stått åpen for lenge. Last den på nytt og prøv igjen.",
+    "tooManyRequests": "For mange forespørsler. Vent litt og prøv igjen.",
+    "unexpected": "Noe gikk galt. Prøv igjen.",
+    "note": {
+      "staleVersion": "Notatet ble endret etter at du åpnet det. Last inn siste versjon og gjør endringen på nytt.",
+      "titleRequired": "Skriv inn en tittel.",
+      "titleTooLong": "Tittelen kan være på høyst 200 tegn.",
+      "bodyTooLong": "Teksten kan være på høyst 10 000 tegn."
+    }
+  }
+}

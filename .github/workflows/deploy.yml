@@ -1,0 +1,281 @@
+name: Deploy
+
+# Build once, promote the same image digest (standard 06):
+#   CI green on main -> Terraform (sandbox) -> build and push the image -> migrations -> sandbox rollout -> smoke test
+#   -> [GitHub environment "prod": required reviewers] -> copy the digest to the prod registry -> migrations -> rollout
+#   -> smoke test -> git tag and GitHub release with SBOM.
+#
+# Prod infrastructure is applied from infra.yml (manual dispatch, same approval rule). Apply it before promoting a
+# release that changes infra/. Rollback: docs/runbooks/rollback.md.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit on main to deploy. Empty means the head of main. Its CI run must have succeeded.
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  CI: 'true' # NuGet locked-mode restore and the pnpm supply-chain policy
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  # The API project that is built into the image. In the template it is the Marten one; scripts/init-app.ps1 rewrites it (template:init-note).
+  # For the EF Core variant it is api/BccCode.Template.Api.EfCore, and infra/variables.tf migrate_args is ["migrate"] (template:init-note).
+  API_PROJECT: api/BccCode.Template.Api.Marten
+  IMAGE_NAME: template-api
+
+jobs:
+  # Deploys depend on green tests for the exact commit being deployed (standard 06 rule 2).
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # A fork can have a branch called main, so require a push-triggered CI run as well.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - id: sha
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          INPUT_SHA: ${{ inputs.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = workflow_run ]; then
+            sha="$RUN_SHA"
+          else
+            sha="${INPUT_SHA:-$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)}"
+            if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then echo "::error::sha must be a full commit id"; exit 1; fi
+            # The commit must be on main, and CI must have passed on it.
+            status=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$sha" --jq .status)
+            case "$status" in identical|behind) ;; *) echo "::error::$sha is not on main"; exit 1 ;; esac
+            ok=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow pr.yml --commit "$sha" --event push --status success --json databaseId --jq length)
+            if [ "$ok" -lt 1 ]; then echo "::error::No successful CI run for $sha"; exit 1; fi
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Deploying $sha" >> "$GITHUB_STEP_SUMMARY"
+
+  infra-sandbox:
+    needs: gate
+    uses: ./.github/workflows/infra.yml
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      environment: sandbox
+      action: apply
+      ref: ${{ needs.gate.outputs.sha }}
+
+  build:
+    needs: [gate, infra-sandbox]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The image is built once and pushed to the sandbox registry; prod receives the same digest.
+    environment: sandbox
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      SHA: ${{ needs.gate.outputs.sha }}
+      REGISTRY_HOST: ${{ vars.GCP_REGION }}-docker.pkg.dev
+      REPOSITORY_PATH: ${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPOSITORY }}
+    outputs:
+      image: ${{ steps.push.outputs.image }}
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+      - uses: ./.github/actions/setup
+        with:
+          frontend: 'true'
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+      # One frontend build for every environment: runtime settings come from the API, not from the bundle (standard 06 rule 3).
+      - run: pnpm --dir frontend run build
+      # index.html is served by the API (with the CSP nonce); only the hashed bundles go to the bucket (standard 26 rule 2).
+      # TODO: the output folder (frontend/dist) and the wwwroot location must match what the API serves. Check against
+      # the API project when the template is first deployed.
+      - name: Bake index.html into the image
+        run: mkdir -p "$API_PROJECT/wwwroot" && cp frontend/dist/index.html "$API_PROJECT/wwwroot/index.html"
+      # The image runs Wolverine with pre-generated code: Release builds have no Roslyn to compile handlers at startup, and the
+      # API asserts that the generated types exist. The code is written from a Debug build (which has Roslyn) into
+      # Internal/Generated, which is not committed, and the Release publish below compiles it into the image. The settings
+      # only let the host build; nothing connects to a database (standard 05, rule 5).
+      - name: Pre-generate the Wolverine code
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ConnectionStrings__template: Host=localhost;Database=x
+        run: |
+          dotnet build "$API_PROJECT" --configuration Debug
+          dotnet run --project "$API_PROJECT" --configuration Debug --no-build -- codegen write
+      - id: push
+        name: Publish the container image (chiseled base image is set in the project file)
+        run: |
+          set -euo pipefail
+          # The SDK pushes straight to Artifact Registry, so the digest is the one the registry holds.
+          export SDK_CONTAINER_REGISTRY_UNAME=oauth2accesstoken
+          export SDK_CONTAINER_REGISTRY_PWORD="$(gcloud auth print-access-token)"
+          dotnet publish "$API_PROJECT" --configuration Release --runtime linux-x64 --self-contained false \
+            /t:PublishContainer \
+            -p:ContainerRegistry="$REGISTRY_HOST" \
+            -p:ContainerRepository="$REPOSITORY_PATH/$IMAGE_NAME" \
+            -p:ContainerImageTags="\"$SHA\""
+          image="$REGISTRY_HOST/$REPOSITORY_PATH/$IMAGE_NAME"
+          digest=$(gcloud artifacts docker images describe "$image:$SHA" --format='value(image_summary.digest)')
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "Image $image@$digest" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: assets
+          path: frontend/dist/assets
+          if-no-files-found: error
+
+  deploy-sandbox:
+    needs: [gate, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: sandbox
+    # Serialised and never cancelled: a cancelled migration can leave the schema half applied (standard 05 rule 10).
+    concurrency:
+      group: env-sandbox
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      ENV: sandbox
+      REGION: ${{ vars.GCP_REGION }}
+      PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      IMAGE: ${{ needs.build.outputs.image }}@${{ needs.build.outputs.digest }}
+      BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
+    steps:
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: assets
+          path: assets
+      - name: Upload hashed assets without deleting old ones, so a rollback keeps working
+        run: gcloud storage cp --recursive --no-clobber --cache-control="public, max-age=31536000, immutable" assets "gs://$PROJECT-assets/"
+      # --wait fails this job when the migration fails, so no revision rolls out against a missing schema.
+      # Flags after --container apply to that container, so job and service flags such as --region come first.
+      - name: Migrate the database
+        run: |
+          gcloud run jobs update "template-migrate-$ENV" --region "$REGION" --container app --image "$IMAGE"
+          gcloud run jobs execute "template-migrate-$ENV" --region "$REGION" --wait
+      - name: Roll out the API
+        run: gcloud run services update "template-api-$ENV" --region "$REGION" --container app --image "$IMAGE"
+      - name: Smoke test
+        run: |
+          for _ in $(seq 1 12); do curl -fsS "$BASE_URL/health" && break || sleep 5; done
+          curl -fsS "$BASE_URL/health"
+          # An unauthenticated browser request for / is sent to the login (standard 06 rule 9). TODO: confirm for this app.
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Accept: text/html' "$BASE_URL/")" = 302
+
+  sbom:
+    needs: gate
+    uses: ./.github/workflows/sbom.yml
+    permissions:
+      contents: read
+    with:
+      ref: ${{ needs.gate.outputs.sha }}
+
+  deploy-prod:
+    needs: [gate, build, deploy-sandbox, sbom]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Required reviewers on this environment approve a known artifact: the digest that ran in sandbox.
+    environment: prod
+    concurrency:
+      group: env-prod
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: write # git tag and GitHub release
+    env:
+      ENV: prod
+      REGION: ${{ vars.GCP_REGION }}
+      PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      SHA: ${{ needs.gate.outputs.sha }}
+      SOURCE_IMAGE: ${{ needs.build.outputs.image }}
+      DIGEST: ${{ needs.build.outputs.digest }}
+      PROD_IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPOSITORY }}/template-api
+      BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+          fetch-depth: 0
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: assets
+          path: assets
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sbom
+          path: sbom
+      # A registry-to-registry copy keeps the manifest, so the digest is the same. The prod deploy account can read the
+      # sandbox repository through image_reader_members (infra/README.md). Both registries are on the same host.
+      - name: Copy the image digest from sandbox
+        run: |
+          set -euo pipefail
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+          docker buildx imagetools create --tag "$PROD_IMAGE:$SHA" "$SOURCE_IMAGE@$DIGEST"
+          copied=$(gcloud artifacts docker images describe "$PROD_IMAGE:$SHA" --format='value(image_summary.digest)')
+          if [ "$copied" != "$DIGEST" ]; then echo "::error::Digest changed during the copy ($DIGEST -> $copied)"; exit 1; fi
+          echo "Promoting $PROD_IMAGE@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload hashed assets without deleting old ones, so a rollback keeps working
+        run: gcloud storage cp --recursive --no-clobber --cache-control="public, max-age=31536000, immutable" assets "gs://$PROJECT-assets/"
+      - name: Migrate the database
+        run: |
+          gcloud run jobs update "template-migrate-$ENV" --region "$REGION" --container app --image "$PROD_IMAGE@$DIGEST"
+          gcloud run jobs execute "template-migrate-$ENV" --region "$REGION" --wait
+      - name: Roll out the API
+        run: gcloud run services update "template-api-$ENV" --region "$REGION" --container app --image "$PROD_IMAGE@$DIGEST"
+      - name: Smoke test
+        run: |
+          for _ in $(seq 1 12); do curl -fsS "$BASE_URL/health" && break || sleep 5; done
+          curl -fsS "$BASE_URL/health"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Accept: text/html' "$BASE_URL/")" = 302
+      # Answers "what is in prod" without reading logs (standard 06 rule 13).
+      - name: Tag and release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          day=$(date -u +%Y-%m-%d)
+          n=$(( $(git ls-remote --tags origin "refs/tags/prod-$day.*" | wc -l) + 1 ))
+          tag="prod-$day.$n"
+          gh release create "$tag" --target "$SHA" --title "$tag" --generate-notes \
+            --notes-start-tag "$(git tag --list 'prod-*' --sort=-creatordate | head -n1)" sbom/* 2>/dev/null \
+            || gh release create "$tag" --target "$SHA" --title "$tag" --generate-notes sbom/*
+          echo "Released $tag (image digest $DIGEST)" >> "$GITHUB_STEP_SUMMARY"

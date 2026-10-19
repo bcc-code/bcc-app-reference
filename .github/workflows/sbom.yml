@@ -1,0 +1,44 @@
+name: SBOM
+
+# CycloneDX SBOMs for the .NET solution and the pnpm workspace (standard 17 rule 11). deploy.yml calls this workflow
+# and attaches the result to the GitHub release of each production deploy. It can also be run by hand.
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit to describe
+        type: string
+        default: ''
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: 'true'
+      CYCLONEDX_DOTNET_VERSION: 6.3.1 # dotnet tool CycloneDX, installed outside the tool manifest to keep the build tools separate
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: ./.github/actions/setup
+        with:
+          frontend: 'true'
+      - name: .NET SBOM
+        run: |
+          set -euo pipefail
+          dotnet tool install CycloneDX --version "$CYCLONEDX_DOTNET_VERSION" --tool-path "$RUNNER_TEMP/cyclonedx"
+          mkdir -p sbom
+          # TODO: not verified with the .slnx solution format; if it is rejected, run it per project instead.
+          "$RUNNER_TEMP/cyclonedx/dotnet-cyclonedx" BccCode.Template.slnx --output sbom --output-format Json --filename dotnet.cdx.json
+      - name: Frontend SBOM
+        run: pnpm --dir frontend sbom --sbom-format cyclonedx --out "$GITHUB_WORKSPACE/sbom/frontend.cdx.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom
+          path: sbom/
+          if-no-files-found: error

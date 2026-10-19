@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="NetArchTest.eNhancedEdition" />
+    <PackageReference Include="Mono.Cecil" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+    <Using Include="AwesomeAssertions" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BccCode.Template.Web\BccCode.Template.Web.csproj" />
+    <!-- Every persistence variant. The wildcard has no dot after "Api" so that it also matches the one project that remains
+         after scripts/init-app.ps1 (BccCode.<App>.Api). The rules find the assemblies by name, so adding or deleting a
+         variant needs no edit here. -->
+    <ProjectReference Include="..\..\BccCode.Template.Api*\BccCode.Template.Api*.csproj" />
+  </ItemGroup>
+</Project>

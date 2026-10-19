@@ -1,0 +1,35 @@
+name: Supply-chain security
+
+# BCC's reusable scan (standard 17 rule 12), on changes to workflows, manifests, lock files and Dockerfiles.
+on:
+  pull_request:
+    branches: [main]
+    paths: &supply-chain-paths
+      - ".github/workflows/**"
+      - "**/action.yml"
+      - "**/action.yaml"
+      - "**/package.json"
+      - "**/package-lock.json"
+      - "**/pnpm-lock.yaml"
+      - "**/pnpm-workspace.yaml"
+      - "**/.npmrc"
+      - "**/Dockerfile"
+      - "**/Dockerfile.*"
+      - "**/*.Dockerfile"
+      - "**/.dockerignore"
+  push:
+    branches: [main]
+    paths: *supply-chain-paths
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  supply-chain:
+    permissions:
+      contents: read
+    uses: bcc-code/bcc-security-scan/.github/workflows/supply-chain-protections.yml@9d9fd26809455a4c554e572f7568f7856a5bec63 # v1.0.1
+    with:
+      # Warnings stay visible but do not fail: vote-rewrite rejects the packageManagerStrictVersion recommendation because
+      # pnpm 12 does not support it. Review this when the scan is updated.
+      fail-on-warn: false
