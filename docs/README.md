@@ -14,3 +14,5 @@
 | [../infra/README.md](../infra/README.md) | Terraform, bootstrapping a new environment |
 
 Documents drafted with AI say so at the top and stay marked until a person has verified them (standard 23, rule 15).
+
+- [Standards assessment](standards-assessment/00-index.md): the template scored against standards 01–26, with gaps to close.
