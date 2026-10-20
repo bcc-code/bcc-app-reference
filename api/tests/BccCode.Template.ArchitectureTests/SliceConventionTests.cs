@@ -1,4 +1,5 @@
 using System.Reflection;
+using BccCode.Template.Web.Messaging;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using NetArchTest.Rules;
@@ -52,26 +53,79 @@ public class SliceConventionTests
     }
 
     // Names, not types, so this file compiles with any variant: Marten's Events, IMartenOp and IStartStream, and the framework's.
-    private static readonly string[] SideEffectNames = ["Events", "IMartenOp", "IStartStream", "ISideEffect", "IResult", "ProblemDetails", "RoutedToEndpointMessage`1"];
+    private static readonly string[] SideEffectNames = ["Events", "IMartenOp", "IStartStream", "ISideEffect", "IResult", "ProblemDetails"];
+
+    private static IEnumerable<MethodInfo> HandlerMethods() =>
+        TemplateAssemblies.Apis.SelectMany(a => a.GetTypes())
+            .Where(t => t.Name.EndsWith("Handler", StringComparison.Ordinal))
+            .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            .Where(m => m.Name.StartsWith("Handle", StringComparison.Ordinal) || m.Name.StartsWith("Consume", StringComparison.Ordinal));
+
+    [Fact]
+    public void Handlers_exist_so_the_rule_below_is_not_vacuous() => HandlerMethods().Should().NotBeEmpty();
 
     /// <summary>
-    /// A returned message must name its endpoint, so it is never routed by convention: in serverless mode an unrouted message
-    /// fails at send time. Everything after the response in an endpoint's return tuple must be a side effect, not a bare message.
+    /// Every message an endpoint or handler returns is an <see cref="IIntegrationMessage"/> (standard 10, rule 9). Only those types
+    /// are routed to the topic (<c>TemplateMessaging</c>), and local routing is off, so any other cascaded type would fail at send time.
+    /// Everything after the response in an endpoint's return tuple, and everything a handler returns, must be a side effect or such a
+    /// message. <c>OutgoingMessages</c> is refused because its content cannot be checked here.
     /// </summary>
     [Fact]
-    public void Every_cascaded_value_is_a_side_effect_and_never_a_bare_message()
+    public void Every_cascaded_message_is_an_integration_message()
     {
-        var bare = new List<string>();
+        var offenders = new List<string>();
         foreach (var method in EndpointMethods())
         {
             var returned = Unwrap(method.ReturnType);
             if (!IsValueTuple(returned)) continue;
-            foreach (var type in returned.GetGenericArguments().Skip(1).Where(t => !IsSideEffect(t)))
-                bare.Add($"{method.DeclaringType!.Name}.{method.Name} cascades a bare {type.Name}");
+            offenders.AddRange(returned.GetGenericArguments().Skip(1).Where(t => !IsAllowedCascade(t)).Select(t => $"{method.DeclaringType!.Name}.{method.Name} cascades {t.Name}"));
+        }
+        foreach (var method in HandlerMethods())
+        {
+            var returned = Unwrap(method.ReturnType);
+            var cascaded = IsValueTuple(returned) ? returned.GetGenericArguments() : [returned];
+            offenders.AddRange(cascaded.Where(t => t != typeof(void) && t != typeof(Task) && t != typeof(ValueTask) && !IsAllowedCascade(t))
+                .Select(t => $"{method.DeclaringType!.Name}.{method.Name} returns {t.Name}"));
         }
 
-        bare.Should().BeEmpty();
+        offenders.Should().BeEmpty("a returned message must implement IIntegrationMessage so that it has a route");
     }
+
+    /// <summary>Messages are sealed records (standard 13, rule 2): immutable, with value equality, and nothing derives from them.</summary>
+    [Fact]
+    public void Integration_messages_are_sealed_records()
+    {
+        var messages = TemplateAssemblies.All.SelectMany(a => a.GetTypes())
+            .Where(t => t is { IsClass: true } && typeof(IIntegrationMessage).IsAssignableFrom(t)).ToList();
+
+        messages.Should().NotBeEmpty("the template has a sample message");
+        messages.Where(t => !t.IsSealed || t.GetMethod("<Clone>$") is null).Select(t => t.FullName).Should().BeEmpty();
+    }
+
+    /// <summary>
+    /// Under ServerlessWithOutbox a scheduled or delayed message is released at the next durability pass, a minute or more late
+    /// (ADR 0007), and a local queue is not routed to. Delayed work is a Cloud Task, periodic work a Cloud Scheduler job.
+    /// </summary>
+    [Fact]
+    public void Nothing_schedules_delays_or_uses_local_queues() =>
+        ForbiddenApiScanner.FindCalls(TemplateAssemblies.All, UnsupportedMessaging).Should().BeEmpty();
+
+    [Fact]
+    public void The_scanner_detects_a_scheduled_message() =>
+        ForbiddenApiScanner.FindCalls([typeof(ScannerFixture).Assembly], UnsupportedMessaging)
+            .Should().ContainSingle(hit => hit.Contains(nameof(ScannerFixture.SchedulesAMessage), StringComparison.Ordinal));
+
+    private static readonly ForbiddenApi[] UnsupportedMessaging =
+    [
+        new("Wolverine", "ScheduleAsync"), new("Wolverine", "ScheduleSend"), new("Wolverine", "ScheduleLocally"),
+        new("Wolverine", "DelayedFor"), new("Wolverine", "ScheduledAt"), new("Wolverine", "ToLocalQueue"),
+        new("Wolverine", "LocalQueue"), new("Wolverine", "DelayedUntil"), new("Wolverine", "ScheduleDelayed"), new("Wolverine", "ScheduleAt"),
+    ];
+
+    private static bool IsAllowedCascade(Type type) =>
+        typeof(IIntegrationMessage).IsAssignableFrom(type)
+        || IsSideEffect(type)
+        || (type.IsGenericType && type.GetGenericArguments() is [var element] && typeof(System.Collections.IEnumerable).IsAssignableFrom(type) && IsAllowedCascade(element));
 
     private static bool IsStorageAction(Type type) => type.IsGenericType && type.GetGenericTypeDefinition().Name == "IStorageAction`1";
 

@@ -14,7 +14,7 @@ for how to choose.
 - `api/BccCode.Template.Web/`: shared HTTP plumbing — BFF authentication, authorization conventions, security headers and
   CSP, CSRF, rate limiting, ProblemDetails, SPA hosting. `TemplateWeb.cs` is the entry point.
 - `api/BccCode.Template.Api.*/Features/`: vertical slices (`Notes`, `CurrentUser`, `Admin`). One slice per file.
-- `api/AppHost/Program.cs`: the local environment. `api/OidcMock/`: mock identity provider with test personas.
+- `api/AppHost/Program.cs`: the local environment (Postgres, Pub/Sub emulator, `tools/pubsub-setup/`). `api/OidcMock/`: mock identity provider with test personas.
 - `frontend/src/`: Vue SPA, organised by feature like the backend slices.
 - `docs/`: [development](docs/development.md), [ADRs](docs/adrs/), [architecture](docs/architecture/),
   [runbooks](docs/runbooks/), [privacy](docs/privacy/data-inventory.md), [tech debt](docs/tech-debt/).
@@ -26,7 +26,7 @@ for how to choose.
 ```bash
 dotnet tool restore                                  # aspire, dotnet-ef
 pnpm --dir frontend install
-aspire run                                           # everything: Postgres, schema, seed, OIDC mock, API, frontend
+aspire run                                           # everything: Postgres, Pub/Sub emulator, schema, seed, OIDC mock, API, frontend
 aspire run --isolated                                # in a git worktree or a second checkout — always
 dotnet build BccCode.Template.slnx                   # also rewrites api/openapi/openapi.json (Debug)
 dotnet test --solution BccCode.Template.slnx         # all backend tests (Docker must run: Testcontainers)
@@ -38,7 +38,8 @@ E2E_BASE_URL=https://template.dev.localhost:<port> pnpm --dir frontend run e2e  
 ```
 
 The AppHost setting `Template:Persistence` (`marten`, default, or `efcore`) picks which API runs. Fixed ports of the
-non-isolated instance: API 18000 (`https://template.dev.localhost:18000`), OIDC mock 18002, Postgres 18010, dashboard 18090.
+non-isolated instance: API 18000 (`https://template.dev.localhost:18000`), OIDC mock 18002, Postgres 18010, Pub/Sub emulator 18020,
+dashboard 18090. The dashboard command "Durability pass" on `api` stands in for Cloud Scheduler.
 
 Personas in the OIDC mock: `user` (member, owns seeded notes), `user2` (second member, for ownership tests), `admin` (admin
 role).
@@ -55,6 +56,17 @@ Each rule says why, and which test or guard enforces it.
   that the id exists. Ownership tests in each variant's test project check that nothing was written.
 - **Authentication is a BFF**: opaque `__Host-` cookie, server-side session store, PKCE, PAR, no tokens in the browser.
   Logout is `POST /user/logout` with the CSRF token, never a GET. See [ADR 0004](docs/adrs/0004-bff-authentication-with-server-side-sessions.md).
+- **Wolverine runs `ServerlessWithOutbox` in every environment** ([ADR 0007](docs/adrs/0007-wolverine-serverless-with-outbox.md)).
+  A message a handler or endpoint returns must implement `IIntegrationMessage`: only those are routed (one Pub/Sub topic,
+  batch size 1), local routing is off, and the architecture tests fail on any other cascaded type and on `ScheduleAsync`,
+  `DelayedFor` or local queues. The message is stored in the outbox in the request's transaction, sent after the commit and pushed
+  back to `POST /internal/pubsub/messages`; handlers must be idempotent. The sample is `NoteArchivedMessage`, cascaded by the
+  archive slice.
+- **`/internal/**` is for Pub/Sub push and Cloud Scheduler only**: not in the OpenAPI document, no user policy. Each route has its
+  own policy (`InternalPubSub`, `InternalScheduler`) on the `GoogleOidc` bearer scheme (audience, service account e-mail,
+  `email_verified`). Startup fails when an internal setting is missing or a route lacks its policy (`InternalRouteGuard`). The push
+  mapper refuses (400) any type that is not an `IIntegrationMessage`. `Internal:AllowAll=true` is for the local emulator only (the
+  AppHost sets it); the host refuses it outside Development and Test.
 - **Slices are static classes; handlers return side effects** (`IMartenOp` / EF storage actions) instead of calling the
   database, so the decision logic is testable without a database. Architecture tests check the slice shape.
 - **Time comes from `TimeProvider`, never `DateTime.Now`/`UtcNow`.** The IL forbidden-API scanner in the architecture tests
@@ -86,6 +98,11 @@ Each rule says why, and which test or guard enforces it.
 - Release builds use Wolverine static code generation. Generate it first:
   `ASPNETCORE_ENVIRONMENT=Development ConnectionStrings__template="Host=localhost;Database=x" dotnet run --project <api> --no-build -- codegen write`,
   then build Release. The generated folder is gitignored.
+- The command-line tools (`codegen`, `resources`, `migrate`, `seed`) run without Pub/Sub or `Internal:*` settings
+  (`CodeGeneration.IsCommandLineTool()`); the schema step creates the envelope tables, including the outgoing `timestamp` column
+  and index. Wolverine's outbox and dead-letter tables hold message bodies, so a message with personal data goes into the data inventory.
+- The Marten domain event `NoteArchived` and the integration message `NoteArchivedMessage` are different things: the event is
+  stored in the stream, the message leaves the service.
 - Marten's `MartenOps.Append(id, expectedVersion, ...)` takes the version the stream will have **after** the append.
 - Logout must be a real HTML form POST (field `__RequestVerificationToken`), because the response redirects through the
   identity provider; `fetch` cannot follow it.

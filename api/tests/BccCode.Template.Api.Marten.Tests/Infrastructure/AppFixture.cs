@@ -30,6 +30,7 @@ public sealed class AppFixture : IAsyncLifetime
     public const string UserHeader = "X-Test-User";
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:18").Build();
+    private readonly PubSubEmulator _pubsub = new();
 
     public IAlbaHost Host { get; private set; } = null!;
 
@@ -37,7 +38,7 @@ public sealed class AppFixture : IAsyncLifetime
 
     public async ValueTask InitializeAsync()
     {
-        await _postgres.StartAsync();
+        await Task.WhenAll(_postgres.StartAsync(), _pubsub.StartAsync());
         Host = await StartHostAsync();
     }
 
@@ -45,6 +46,7 @@ public sealed class AppFixture : IAsyncLifetime
     {
         await Host.DisposeAsync();
         await _postgres.DisposeAsync();
+        await _pubsub.DisposeAsync();
     }
 
     /// <summary>Another host on the same database, for a test that changes configuration.</summary>
@@ -60,6 +62,10 @@ public sealed class AppFixture : IAsyncLifetime
                 ["Auth:AdminRole"] = "admin",
                 ["Frontend:Mode"] = "Static",
                 ["Frontend:StaticPath"] = TestFrontend.Path,
+                // Messages go to the emulator. It sends no Google tokens, so the /internal routes are open in these hosts; the
+                // tests of the internal authentication start their own hosts without this.
+                ["Messaging:PubsubProjectId"] = PubSubEmulator.ProjectId,
+                ["Internal:AllowAll"] = "true",
             };
             foreach (var (key, value) in settings ?? new Dictionary<string, string?>()) all[key] = value;
             foreach (var (key, value) in all) builder.UseSetting(key, value);

@@ -5,6 +5,8 @@
 #   - a Cloud Run job that runs the migrations, executed after every apply;
 #   - the OIDC mock service that the API logs in through (var.oidc_mock_image);
 #   - the Auth Proxy sidecar and the connection string, as in ../cloudrun_api.tf.
+#   - messaging: the Pub/Sub topic, push subscription and durability pass job of ../pubsub.tf and ../scheduler.tf, with the
+#     Messaging__* and Internal__* settings of ../cloudrun_api.tf. The preview has no database, so it has no outbox either.
 # Every resource is named <app>-<thing>-pr<N> and labelled with the PR, so a stray resource can be traced to its PR.
 
 locals {

@@ -12,6 +12,8 @@ environment (`sandbox`, `prod`), each in its own GCP project with its own state.
 | `cloudrun_migrate.tf` | Cloud Run job that applies the schema before a rollout |
 | `database.tf` | Cloud SQL Postgres with IAM authentication, IAM database users |
 | `iam.tf` | One service account per runtime and caller, GitHub Workload Identity Federation |
+| `pubsub.tf` | Messages topic, push subscription, dead-letter topic and inspect subscription, push service account, topic IAM |
+| `scheduler.tf` | Cloud Scheduler job for the durability pass, scheduler service account |
 | `kms.tf` | Key for the Data Protection keys (90-day rotation, `prevent_destroy`) |
 | `secrets.tf` | Secret Manager containers, no values |
 | `storage.tf` | Private assets bucket for the content-hashed frontend bundles |
@@ -108,6 +110,69 @@ The state holds no secret values: secrets are containers only (`secrets.tf`). It
 service account emails and the database connection name, so limit the state bucket to infra admins, `sa-<app>-tf-<env>`
 (read and write) and `sa-<app>-plan-<env>` (read only; plan runs with `-lock=false`).
 
+## Serverless messaging (Pub/Sub and Cloud Scheduler)
+
+The API runs Wolverine with `DurabilityMode.ServerlessWithOutbox`: a handler writes outgoing integration messages to the
+Postgres outbox in its transaction and publishes them to Pub/Sub after the commit; Pub/Sub pushes each message back to the
+API, so handlers run inside a request (Cloud Run only gives an instance CPU while it serves one). A Cloud Scheduler job
+sends outbox rows whose inline send failed. Runbooks: [pubsub-dead-letters](../docs/runbooks/pubsub-dead-letters.md),
+[durability-pass](../docs/runbooks/durability-pass.md).
+
+| Resource | Name | Purpose |
+|---|---|---|
+| Topic | `template-messages-<env>` | The one topic the API publishes to |
+| Push subscription | `template-messages-push-<env>` | `POST <api>/internal/pubsub/messages`, OIDC token, ack deadline 600 s, retry backoff 10 to 600 s, 5 delivery attempts, then dead letter |
+| Topic | `template-dead-letter-<env>` | Messages that failed 5 deliveries |
+| Pull subscription | `template-dead-letter-inspect-<env>` | Keeps them 7 days for inspection; nothing consumes it |
+| Scheduler job | `template-durability-pass-<env>` | Every minute, `POST <api>/internal/durability/pass`, attempt deadline 60 s, no retry (the next minute is the retry), in the API's region |
+| Service accounts | `sa-template-pubsub-push-<env>`, `sa-template-scheduler-<env>` | Identities of the push and the scheduler tokens |
+
+Environment variables of the API (`local.api_env`, also on the migration job): `Messaging__PubsubProjectId` (project id),
+`Messaging__Topic` (topic name), `Internal__PubSubAudience` and `Internal__SchedulerAudience` (fixed strings
+`https://<service name>/internal/pubsub` and `.../internal/scheduler`, also set as the Cloud Run `custom_audiences`),
+`Internal__PubSubServiceAccount` and `Internal__SchedulerServiceAccount` (the account emails). `Internal__AllowAll` is never
+set. The Cloud Run request timeout is 600 s so a push can use its full ack deadline.
+
+IAM grants, all on the resource named:
+
+| Grant | On | Why |
+|---|---|---|
+| `roles/pubsub.publisher`, `roles/pubsub.viewer` to the API account | messages topic | Publish the outbox; Wolverine's resource check reads the topic at startup |
+| `roles/run.invoker` to the push account, and to the scheduler account | the API service | Both send an identity token. The service also has `allUsers` as invoker (the gateway sends no token), so these two grants are the intended callers rather than a restriction; the restriction is the app's check of the token's audience and account |
+| `roles/iam.serviceAccountTokenCreator` to the Pub/Sub service agent, and to the Cloud Scheduler service agent | push account, scheduler account respectively | The agents mint the OIDC tokens |
+| `roles/pubsub.publisher` to the Pub/Sub service agent | dead-letter topic | Forward undeliverable messages |
+| `roles/pubsub.subscriber` to the Pub/Sub service agent | push subscription | Acknowledge a message it dead-lettered |
+| `roles/iam.serviceAccountUser` to the Terraform account | push account, scheduler account | actAs, needed to create an OIDC subscription or job |
+| `roles/pubsub.admin`, `roles/cloudscheduler.admin`, `roles/logging.configWriter` to the Terraform account | project | Manage these services and the log-based metrics (see `iam.tf`) |
+
+Alerts (`monitoring.tf`, all with a runbook link): messages in the dead-letter inspect subscription, oldest unacked message
+on the push subscription above 15 minutes, Wolverine's "was moved to the error queue" log line, durability pass failures
+and Cloud Scheduler job failures. The log-based metrics depend on log wording (standard 22 rule 14): they match Wolverine 6.51.0's own
+message templates (listed in `monitoring.tf`), so check them when Wolverine is upgraded.
+
+Notes:
+
+- The API database connection goes through the Cloud SQL Auth Proxy straight to Cloud SQL, with no managed connection
+  pooling. The durability pass takes a session-level advisory lock, which is a problem behind a pooler in transaction mode
+  (the lock and the unlock can reach different server sessions). If managed pooling is turned on for this instance, give the
+  message store a direct connection first.
+- `ingress` is `INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER`. Pub/Sub push and Cloud Scheduler calls to the `run.app` URL are
+  documented as allowed under this setting, but this has not been tried here: check it with the manual checks below. Do not
+  route `/internal/**` through the platform gateway.
+- Push subscriptions are created with the service URL, so the first apply creates the Cloud Run service with the placeholder
+  image. Nothing publishes before the first deploy, so no push fails in the meantime.
+
+Manual checks after the first apply and deploy (sandbox):
+
+1. `gcloud scheduler jobs run template-durability-pass-sandbox --location <region>`, then read the API log: the pass
+   answers 200, and the Cloud Scheduler log shows no error.
+2. Trigger an action that publishes a message and check that it arrives: `gcloud pubsub subscriptions describe
+   template-messages-push-sandbox` shows the push endpoint, and the API log shows the handler running.
+3. Call `/internal/durability/pass` and `/internal/pubsub/messages` without a token, and with a token of the wrong audience
+   or account: both must answer 401 or 403.
+4. Pause the API's push (for example by returning 500 from a test handler in sandbox) and check that the message reaches
+   `template-dead-letter-inspect-sandbox` after 5 attempts and that the alert fires.
+
 ## Guard rails
 
 - Prod requires `alert_emails` (precondition in `cloudrun_api.tf`).
@@ -135,4 +200,5 @@ terraform -chdir=infra/preview init -backend=false && terraform -chdir=infra/pre
   the Marten API project and its AppHost on 2026-10-19. `migrate_args` defaults to the Marten schema command
   (`resources setup`); set it for the EF Core variant.
 - Dashboards: only alert policies exist. Add a dashboard when the Grafana decision (standard 22 rule 15) is made.
+- Cloud Scheduler is offered in the API's region (checked for europe-west4 by the Privacy app with `gcloud scheduler locations list`); check the region you use.
 - Not applied against a real GCP project. Roles and the monitoring filters are checked by `validate` for syntax only.

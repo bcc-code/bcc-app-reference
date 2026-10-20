@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using BccCode.Template.Api.Marten.Features.Notes;
+using BccCode.Template.Web.Messaging;
 using Microsoft.Extensions.Time.Testing;
 using Wolverine.Http;
 
@@ -42,6 +43,17 @@ public class NoteSliceTests
         EditNoteEndpoint.Validate(invalid, note, User("owner")).Item2.Status.Should().Be(409, "then a stale version");
         EditNoteEndpoint.Validate(invalid with { Version = 3 }, note, User("owner")).Item2.Status.Should().Be(400, "then the body");
         EditNoteEndpoint.Validate(new EditNote("New", "", 3), note, User("owner")).Item2.Should().BeSameAs(WolverineContinue.NoProblems);
+    }
+
+    [Fact]
+    public void Archiving_appends_an_event_and_hands_the_message_to_the_outbox()
+    {
+        var note = Stored(version: 2);
+
+        var (append, message) = ArchiveNoteEndpoint.Post(note.Id, new ArchiveNote(2), note, _time);
+
+        append.Should().NotBeNull();
+        message.Should().Be(new NoteArchivedMessage(note.Id));
     }
 
     [Fact]
@@ -114,7 +126,8 @@ public class NoteSliceTests
     public void Every_note_event_is_handled_by_the_note_aggregate()
     {
         var events = typeof(Note).Assembly.GetTypes().Where(t => t.Namespace == typeof(Note).Namespace && t.Name.StartsWith("Note", StringComparison.Ordinal) && t.IsSealed
-                                                                  && t.GetMethod("<Clone>$") is not null && t != typeof(NoteResponse));
+                                                                  && t.GetMethod("<Clone>$") is not null && t != typeof(NoteResponse)
+                                                                  && !typeof(IIntegrationMessage).IsAssignableFrom(t));   // messages are not events
         var handled = typeof(Note).GetMethods().Where(m => m.Name is "Apply" or "Create").Select(m => m.GetParameters().Single().ParameterType).ToHashSet();
 
         events.Should().NotBeEmpty();

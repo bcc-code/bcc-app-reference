@@ -18,5 +18,6 @@ An ADR records one decision: why it was made and what follows from it. The forma
 | [0004](0004-bff-authentication-with-server-side-sessions.md) | BFF authentication with server-side sessions | Accepted |
 | [0005](0005-wolverine-http-and-vertical-slices.md) | Wolverine HTTP endpoints in vertical slices | Accepted |
 | [0006](0006-no-slopwatch.md) | No Slopwatch in the template | Accepted |
+| [0007](0007-wolverine-serverless-with-outbox.md) | Wolverine ServerlessWithOutbox with Pub/Sub push | Accepted |
 
 This list is kept by hand. When you add an ADR, add its row here.

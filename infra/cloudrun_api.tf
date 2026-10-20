@@ -14,6 +14,14 @@ locals {
     # /app. The host requires the path in Static mode (the default outside Development) and fails at startup without it;
     # the migration job runs the same host, so it needs it too.
     Frontend__StaticPath = "/app/wwwroot"
+    # Wolverine runs ServerlessWithOutbox: the outbox publishes to this topic and /internal/** accepts only these callers
+    # (pubsub.tf, scheduler.tf). Internal__AllowAll is for local runs and is never set here.
+    Messaging__PubsubProjectId        = var.project_id
+    Messaging__Topic                  = google_pubsub_topic.messages.name
+    Internal__PubSubAudience          = local.internal_pubsub_audience
+    Internal__PubSubServiceAccount    = google_service_account.pubsub_push.email
+    Internal__SchedulerAudience       = local.internal_scheduler_audience
+    Internal__SchedulerServiceAccount = google_service_account.scheduler.email
     # Required by standard 22 rule 2. No OTLP endpoint is set: under request-based billing spans are best effort and
     # alerting depends on metrics and logs only (docs/runbooks/README.md).
     OTEL_SERVICE_NAME        = "${local.app}-api"
@@ -31,10 +39,14 @@ resource "google_cloud_run_v2_service" "api" {
   # after the gateway route is live and verified; with a wrong route and this value there is no way in.
   ingress = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
 
+  # Lets Cloud Run accept the Pub/Sub push and Cloud Scheduler tokens, whose audience is not the service URL.
+  custom_audiences = [local.internal_pubsub_audience, local.internal_scheduler_audience]
+
   template {
     service_account                  = google_service_account.api.email
     max_instance_request_concurrency = 80
-    timeout                          = "30s"
+    # Covers the longest push: the push subscription's ack deadline is 600 s (pubsub.tf).
+    timeout = "600s"
     scaling {
       min_instance_count = local.cfg.api_min_instances
       max_instance_count = local.cfg.api_max_instances

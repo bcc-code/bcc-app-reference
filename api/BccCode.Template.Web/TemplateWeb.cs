@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using BccCode.Template.Web.Auth;
 using BccCode.Template.Web.Frontend;
 using BccCode.Template.Web.Http;
+using BccCode.Template.Web.Internal;
 
 namespace BccCode.Template.Web;
 
@@ -25,6 +26,7 @@ public static class TemplateWeb
         });
         builder.AddTemplateForwardedHeaders();
         builder.AddTemplateAuth();
+        builder.AddTemplateInternalAuth();
         builder.AddTemplateRateLimiting();
         builder.AddTemplateOpenApi(apiTitle);
         builder.AddTemplateFrontend();
@@ -60,5 +62,6 @@ public static class TemplateWeb
         if (app.Environment.IsDevelopment()) modeRoutes.Add(OpenApiConfiguration.DevelopmentDocumentRoute);
         if (app.Configuration.GetSection("Frontend").Get<FrontendOptions>()?.Mode == FrontendMode.Vite) modeRoutes.Add(FrontendConfiguration.ViteProxyRoute);
         app.AssertAnonymousRoutes([.. modeRoutes]);
+        app.AssertInternalRoutes();
     }
 }

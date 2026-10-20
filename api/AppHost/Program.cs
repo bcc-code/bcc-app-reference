@@ -14,6 +14,19 @@ if (isSoleInstance)
 #pragma warning restore ASPIREPROXYENDPOINTS001
 if (!isE2E)
     postgres.WithDbx(dbx => dbx.WithParentRelationship(postgres).WithHostPort(Port(18011)));
+// The Pub/Sub emulator: the outbox publishes to it and the setup step below points a push subscription at the API, so a local
+// run uses the path that runs in GCP. The pinned image is google-cloud-cli 587.0.0-emulators; pin a newer digest on purpose.
+const string pubsubProject = "template-local";
+var pubsub = builder.AddContainer("pubsub", "gcr.io/google.com/cloudsdktool/google-cloud-cli")
+    .WithImageSHA256("8d8573471c489a409f03891d2c24d177fa531276184f7002b9a2d853d1b3ed54")
+    .WithHttpEndpoint(targetPort: 8085, port: Port(18020), name: "pubsub")
+    .WithEntrypoint("gcloud")
+    .WithArgs("beta", "emulators", "pubsub", "start", "--host-port=0.0.0.0:8085", $"--project={pubsubProject}")
+    // "Running" only means the container started; the emulator takes a while to listen.
+    .WithHttpHealthCheck("/", endpointName: "pubsub")
+    // The emulator calls the API on the host; Docker Desktop has this name, Linux needs it.
+    .WithContainerRuntimeArgs("--add-host", "host.docker.internal:host-gateway");
+
 // template:remove-on-init:begin
 // Template:Persistence picks the variant (marten or efcore, default marten). Each variant gets its own database name, so
 // switching variant on the persistent local volume never puts two schemas in one database. The connection name stays
@@ -59,6 +72,21 @@ var api = persistence switch
 // template:init-marten var api = AddVariant<Projects.BccCode_Template_Api_Marten>(["resources", "setup"], ["seed"]);
 // template:init-efcore var api = AddVariant<Projects.BccCode_Template_Api_EfCore>(["migrate"], ["seed"]);
 
+// The emulator pushes from its own container, so the target is the API's http endpoint as Aspire exposes it to containers. A
+// hand-built host.docker.internal URL with the host port fails on Linux: that port is a proxy on 127.0.0.1 only. The API's
+// https endpoint is not used: the container does not trust the ASP.NET development certificate.
+var apiFromContainers = api.GetEndpoint("http", KnownNetworkIdentifiers.DefaultAspireContainerNetwork).Property(EndpointProperty.Url);
+var pubsubSetup = builder.AddContainer("pubsub-setup", "curlimages/curl")
+    .WithImageSHA256("c1fe1679c34d9784c1b0d1e5f62ac0a79fca01fb6377cdd33e90473c6f9f9a69")   // 8.11.1
+    .WithBindMount("../../tools/pubsub-setup", "/setup", isReadOnly: true)
+    .WithEntrypoint("sh")
+    .WithArgs("/setup/setup.sh")
+    .WithEnvironment("PUBSUB", pubsub.GetEndpoint("pubsub"))
+    .WithEnvironment("PROJECT", pubsubProject)
+    .WithEnvironment("API", apiFromContainers)
+    .WithParentRelationship(pubsub)
+    .WaitFor(pubsub);
+
 var oidc = builder.AddProject<Projects.OidcMock>("oidc")
     .WithEnvironment("Client__Urls__0", api.GetEndpoint("https"))
     // The browser uses the *.dev.localhost name (standard 02): it needs no hosts-file entry and gives the app its own cookie scope.
@@ -69,6 +97,14 @@ api.WithEnvironment("OIDC__Authority", oidcEndpoint)
     // Locally every browser, agent and E2E run shares one client IP, so the production default (30 per minute) trips after a
     // few test runs. Deployed environments keep the default.
     .WithEnvironment("RateLimits__AnonymousPerMinute", "600")
+    // Messages go to the emulator. It sends no Google tokens, so the /internal routes are open here; the API refuses this
+    // setting outside Development and Test. Deployed environments set the Internal:* audiences and service accounts instead.
+    .WithEnvironment("PUBSUB_EMULATOR_HOST", pubsub.GetEndpoint("pubsub").Property(EndpointProperty.HostAndPort))
+    .WithEnvironment("Messaging__PubsubProjectId", pubsubProject)
+    .WithEnvironment("Messaging__Topic", "template-messages")
+    .WithEnvironment("Internal__AllowAll", "true")
+    .WaitFor(pubsub)
+    .WaitForCompletion(pubsubSetup)
     .WithHttpHealthCheck("/health", endpointName: "http")
     .WaitFor(oidc)
     .WithUrls(context =>
@@ -76,6 +112,11 @@ api.WithEnvironment("OIDC__Authority", oidcEndpoint)
         var endpoint = api.GetEndpoint("https");
         context.Urls.Add(new ResourceUrlAnnotation { Url = $"https://template.dev.localhost:{endpoint.Port}", DisplayText = "Template" });
     });
+
+// There is no Cloud Scheduler locally: sends the outbox rows whose send failed over a minute ago, as the scheduler does every
+// minute in GCP.
+api.WithHttpCommand("/internal/durability/pass", "Durability pass", "http",
+    commandOptions: new HttpCommandOptions { IconName = "BoxCheckmark", Description = "Sends outbox messages whose send failed over a minute ago, as Cloud Scheduler does every minute in GCP" });
 
 if (isE2E)
 {

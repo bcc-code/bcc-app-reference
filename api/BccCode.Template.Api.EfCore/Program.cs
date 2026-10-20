@@ -3,6 +3,7 @@ using BccCode.Template.Api.EfCore.Infrastructure;
 using BccCode.Template.ServiceDefaults;
 using BccCode.Template.Web;
 using BccCode.Template.Web.Http;
+using BccCode.Template.Web.Internal;
 using JasperFx;
 using Wolverine.Http;
 
@@ -23,6 +24,7 @@ app.MapWolverineEndpoints(options =>
     if (!CodeGeneration.IsGeneratingOpenApi()) options.WarmUpRoutes = RouteWarmup.Lazy;
     options.UseTemplateConventions();
 });
+app.MapTemplateInternal(typeof(Program).Assembly);
 app.MapDefaultEndpoints();
 app.AssertTemplateRoutes();
 

@@ -24,8 +24,8 @@ public class LayerRulesTests
     }
 
     /// <summary>
-    /// Serverless style (no CPU between requests): nothing runs in the background. Delivery of any messages the app sends later
-    /// is a decision for an ADR; until then a hosted service is a mistake.
+    /// Serverless style (no CPU between requests): nothing runs in the background. Messages are delivered by the outbox, Pub/Sub push
+    /// and the durability pass (ADR 0007), all of them HTTP requests; a hosted service would only run while an instance is awake.
     /// </summary>
     [Fact]
     public void Nothing_runs_in_the_background() =>

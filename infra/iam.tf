@@ -167,10 +167,13 @@ resource "google_project_iam_member" "terraform" {
   for_each = toset([
     "roles/artifactregistry.admin",
     "roles/cloudkms.admin",
+    "roles/cloudscheduler.admin",
     "roles/cloudsql.admin",
     "roles/iam.serviceAccountAdmin",
     "roles/iam.workloadIdentityPoolAdmin",
+    "roles/logging.configWriter", # log-based metrics
     "roles/monitoring.admin",
+    "roles/pubsub.admin",
     "roles/resourcemanager.projectIamAdmin", # project-level bindings in this file
     "roles/run.admin",
     "roles/secretmanager.admin",

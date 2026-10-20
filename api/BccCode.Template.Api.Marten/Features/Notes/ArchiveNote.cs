@@ -23,6 +23,7 @@ public static class ArchiveNoteEndpoint
     [WolverinePost("/api/notes/{noteId}/archive"), EmptyResponse]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public static IMartenOp Post(Guid noteId, ArchiveNote command, [NotBody] Note note, TimeProvider time) =>
-        MartenOps.Append(noteId, note.Version + 1, new NoteArchived(time.GetUtcNow()));
+    public static (IMartenOp, NoteArchivedMessage) Post(Guid noteId, ArchiveNote command, [NotBody] Note note, TimeProvider time) =>
+        // The event and the message are stored in one transaction; the message is sent after the commit.
+        (MartenOps.Append(noteId, note.Version + 1, new NoteArchived(time.GetUtcNow())), new NoteArchivedMessage(noteId));
 }

@@ -18,8 +18,8 @@ pnpm --dir frontend install
 aspire run
 ```
 
-`aspire run` starts everything the application needs: Postgres, the schema migration step, the OIDC mock, the API and the
-frontend dev server. No secret or `.env` file is needed. `aspire describe` prints the real URLs and ports of the running
+`aspire run` starts everything the application needs: Postgres, a Pub/Sub emulator with its setup step, the schema migration
+step, the OIDC mock, the API and the frontend dev server. No secret or `.env` file is needed. `aspire describe` prints the real URLs and ports of the running
 resources, and the dashboard lists them.
 
 The AppHost setting `Template:Persistence` selects the API that runs: `marten` (default) or `efcore`.
@@ -29,6 +29,19 @@ Template__Persistence=efcore aspire run   # PowerShell: $env:Template__Persisten
 ```
 
 Only one of the two APIs runs at a time. After `scripts/init-app.ps1` the setting is gone.
+
+### Messaging locally
+
+The API runs Wolverine in `ServerlessWithOutbox` mode in every environment ([ADR 0007](adrs/0007-wolverine-serverless-with-outbox.md)).
+Archiving a note writes a `NoteArchivedMessage` to the outbox in the request's transaction, sends it to the emulator's
+`template-messages` topic, and the emulator pushes it back to `POST /internal/pubsub/messages`, where `NoteArchivedHandler`
+logs "Note ... was archived". `tools/pubsub-setup/setup.sh` creates the topics and the push subscription (`aspire logs pubsub-setup`
+shows it). The emulator sends no Google tokens, so the AppHost sets `Internal__AllowAll=true` for the API; the API refuses that
+setting outside Development and Test.
+
+There is no Cloud Scheduler locally. The dashboard command **Durability pass** on the `api` resource calls
+`POST /internal/durability/pass`, which sends outbox rows whose send failed more than a minute ago. The emulator image is pinned
+by digest in `api/AppHost/Program.cs`; the ports are 18020 (emulator) for the sole instance and random with `--isolated` and E2E.
 
 The browser talks to one HTTPS origin. The API proxies the Vite dev server, so cookies, CSRF and the content security policy
 behave as in production (standard 02, rule 15).
@@ -63,7 +76,8 @@ dotnet test --solution BccCode.Template.slnx           # all backend tests, both
 pnpm --dir frontend run test                            # frontend unit tests (vitest)
 ```
 
-The backend integration tests start Postgres with Testcontainers, so Docker must be running. They include the architecture
+The backend integration tests start Postgres and the Pub/Sub emulator with Testcontainers (the first run pulls the emulator image,
+about 450 MB), so Docker must be running. They include the architecture
 tests, and a test that fails when the committed OpenAPI document is stale. The checks that CI runs are listed in
 `.github/workflows/pr.yml`: `dotnet format --verify-no-changes`, and in the frontend `lint`, `format:check`,
 `type-check`, `test`, `knip`, `build`, plus the Playwright E2E tests against the AppHost's `E2E=true` topology for each persistence variant. Run the same commands before you push.

@@ -4,4 +4,6 @@ namespace BccCode.Template.ArchitectureTests;
 internal static class ScannerFixture
 {
     public static DateTimeOffset ReadsTheInstanceClock() => DateTimeOffset.UtcNow;
+
+    public static object SchedulesAMessage() => Wolverine.ConfiguredMessageExtensions.DelayedFor(new object(), TimeSpan.FromMinutes(1));
 }

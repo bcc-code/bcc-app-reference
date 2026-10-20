@@ -24,9 +24,10 @@ public static class ArchiveNoteEndpoint
     [WolverinePost("/api/notes/{noteId}/archive"), EmptyResponse]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
-    public static IStorageAction<Note> Post(Guid noteId, ArchiveNote command, [NotBody] Note note, TimeProvider time)
+    public static (IStorageAction<Note>, NoteArchivedMessage) Post(Guid noteId, ArchiveNote command, [NotBody] Note note, TimeProvider time)
     {
         note.Archive(time.GetUtcNow());
-        return Storage.Update(note);
+        // The update and the message are stored in one transaction; the message is sent after the commit.
+        return (Storage.Update(note), new NoteArchivedMessage(noteId));
     }
 }

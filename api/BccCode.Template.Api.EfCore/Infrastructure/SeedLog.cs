@@ -1,3 +1,5 @@
+using BccCode.Template.Api.EfCore.Features.Notes;
+
 namespace BccCode.Template.Api.EfCore.Infrastructure;
 
 /// <summary>
@@ -15,5 +17,5 @@ public sealed partial class SeedLog(ILogger<SeedLog> logger)
 
 public static class TemplateLogs
 {
-    public static IServiceCollection AddTemplateLogs(this IServiceCollection services) => services.AddSingleton<SeedLog>();
+    public static IServiceCollection AddTemplateLogs(this IServiceCollection services) => services.AddSingleton<SeedLog>().AddSingleton<NotesLog>();
 }

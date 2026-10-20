@@ -4,6 +4,7 @@ using BccCode.Template.Api.Marten.Infrastructure;
 using BccCode.Template.ServiceDefaults;
 using BccCode.Template.Web;
 using BccCode.Template.Web.Http;
+using BccCode.Template.Web.Internal;
 using JasperFx;
 using Microsoft.AspNetCore.Mvc;
 using Wolverine.Http;
@@ -30,6 +31,7 @@ app.MapWolverineEndpoints(options =>
     options.MapMartenConcurrencyFailuresToConflict(chain =>
         chain.Method.Method.GetCustomAttributes<ProducesResponseTypeAttribute>().Any(a => a.StatusCode == StatusCodes.Status409Conflict));
 });
+app.MapTemplateInternal(typeof(Program).Assembly);
 app.MapDefaultEndpoints();
 app.AssertTemplateRoutes();
 

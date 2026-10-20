@@ -33,6 +33,19 @@ output "migrate_job_name" {
   value = google_cloud_run_v2_job.migrate.name
 }
 
+output "messages_topic" {
+  value = google_pubsub_topic.messages.name
+}
+
+output "dead_letter_inspect_subscription" {
+  description = "Pull subscription that holds dead-lettered messages for 7 days (docs/runbooks/pubsub-dead-letters.md)."
+  value       = google_pubsub_subscription.dead_letter_inspect.name
+}
+
+output "durability_pass_job" {
+  value = google_cloud_scheduler_job.durability_pass.name
+}
+
 output "assets_bucket" {
   value = google_storage_bucket.assets.name
 }

@@ -40,6 +40,11 @@ and does not keep the `email` claim.
 - **Marten variant:** notes are an event stream (`NoteCreated`, `NoteEdited`, `NoteArchived`) with a projection. The events hold
   the owner id and the content as written.
 - **EF Core variant:** one row per note with the owner id and the content.
+- **Message outbox and dead letters:** Wolverine stores each outgoing message in `wolverine_outgoing_envelopes` until Pub/Sub has
+  accepted it, and a pushed message that cannot be read in `wolverine_dead_letters`. Both hold the message body, as the app
+  defines it (the sample `NoteArchivedMessage` holds only the note id). Dead letters are kept 7 days, then the durability pass
+  deletes them. Pub/Sub keeps an undelivered message and the dead-letter topic's messages for its own retention period (Terraform).
+  A message type that carries personal data must say so here.
 - **Frontend:** the browser holds the session cookie and what the page shows. The SPA keeps no personal data in local storage.
 - **Logs:** structured JSON in Cloud Logging.
 - **Previews and local development:** generated test data only, never production data (standard 18, rule 15, standard 07).
@@ -50,6 +55,8 @@ and does not keep the `email` claim.
 |---|---|---|
 | Notes | Not decided (open question 2). Archiving hides a note from the user but does not delete it | None in the sample: there is no scheduled purge and no erasure endpoint |
 | Sessions | Until logout, expiry or back-channel logout | Session expiry |
+| Outbox rows | Until the message is sent; a row whose send keeps failing stays | The durability pass deletes sent rows |
+| Wolverine dead letters | 7 days | The durability pass (`DeadLetterQueueExpiration`) |
 | Backups | Cloud SQL backup retention | Expire with the backup retention |
 
 This is a gap against standard 18, rules 6 and 7: retention must be a scheduled purge job with tests, and a deletion path must

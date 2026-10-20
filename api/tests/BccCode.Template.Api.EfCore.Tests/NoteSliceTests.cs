@@ -81,9 +81,10 @@ public class NoteSliceTests
     {
         var note = Stored(version: 2);
 
-        var update = ArchiveNoteEndpoint.Post(note.Id, new ArchiveNote(2), note, _time);
+        var (update, message) = ArchiveNoteEndpoint.Post(note.Id, new ArchiveNote(2), note, _time);
 
         update.Entity.Should().BeSameAs(note);
+        message.Should().Be(new NoteArchivedMessage(note.Id), "the archive slice hands the message to the outbox as a side effect");
         (note.Archived, note.Version, note.UpdatedAt).Should().Be((true, 3, Now));
         NoteRules.IsVisibleTo(note, "owner").Should().BeFalse();
     }
