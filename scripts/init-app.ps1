@@ -29,7 +29,7 @@
     The first port of the application's range for the sole local instance (standard 02.8): every port in the template's range
     16000-16099 (API 16000, Vite 16001, Postgres 16010, ..., Structurizr 16060) moves by the same offset, in all text files (the
     AppHost, the launch settings, .claude/launch.json, appsettings, docs). Pick a base whose 100 ports no other BCC app uses; the
-    slot layout is in api/AppHost/Program.cs. Defaults to 16000 (no change), with a warning, because two apps on the same
+    slot layout is in api/AppHost/RunMode.cs (LocalPorts). Defaults to 16000 (no change), with a warning, because two apps on the same
     developer machine then fight over the ports.
 
 .PARAMETER Force
