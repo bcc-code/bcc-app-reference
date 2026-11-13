@@ -1,19 +1,15 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.6.0">
+<Project Sdk="Aspire.AppHost.Sdk/13.6.5">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <UserSecretsId>bcc-template-apphost</UserSecretsId>
+    <IsPackable>false</IsPackable>
     <!-- ASPIRE010: the AppHost runs through dotnet run and the aspire.cli tool manifest, not the Aspire CLI bundle. -->
     <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\OidcMock\OidcMock.csproj" />
-    <!-- One reference per persistence variant. Template:Persistence picks which of them runs (see Program.cs). -->
-    <!-- template:only-efcore:begin -->
-    <ProjectReference Include="..\BccCode.Template.Api.EfCore\BccCode.Template.Api.EfCore.csproj" />
-    <!-- template:only-efcore:end -->
-    <!-- template:only-marten:begin -->
-    <ProjectReference Include="..\BccCode.Template.Api.Marten\BccCode.Template.Api.Marten.csproj" />
-    <!-- template:only-marten:end -->
+    <ProjectReference Include="..\BccCode.Template.Api\BccCode.Template.Api.csproj" />
+    <ProjectReference Include="..\BccCode.Template.TestData\BccCode.Template.TestData.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.JavaScript" />

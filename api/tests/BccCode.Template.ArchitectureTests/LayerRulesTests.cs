@@ -5,29 +5,35 @@ namespace BccCode.Template.ArchitectureTests;
 
 public class LayerRulesTests
 {
-    /// <summary>The web project is shared by every variant, so it cannot know about one: no Marten, no EF Core, no variant namespace.</summary>
+    /// <summary>
+    /// ADR 0025: the feature project holds the slices and what they share; what only the host uses (sign-in, the reverse proxy,
+    /// Pub/Sub, KMS, hosting) stays in <c>BccCode.Template.Api</c>, so a slice cannot grow a dependency on it.
+    /// </summary>
     [Fact]
-    public void The_web_project_does_not_depend_on_a_persistence_variant() =>
-        Types.InAssemblies(TemplateAssemblies.Web).ShouldNot()
-            .HaveDependencyOnAny("Marten", "Wolverine.Marten", "Microsoft.EntityFrameworkCore", "Npgsql", "BccCode.Template.Api")
-            .GetResult().FailingTypes.Select(t => t.FullName).Should().BeNullOrEmpty();
-
-    [Fact]
-    public void A_variant_does_not_depend_on_another_variant()
+    public void The_feature_project_does_not_depend_on_host_only_infrastructure()
     {
-        foreach (var api in TemplateAssemblies.Apis)
-        {
-            var others = TemplateAssemblies.Apis.Where(a => a != api).Select(a => a.GetName().Name!).ToArray();
-            if (others.Length == 0) continue;
-            Types.InAssembly(api).ShouldNot().HaveDependencyOnAny(others).GetResult().FailingTypes.Select(t => t.FullName).Should().BeNullOrEmpty();
-        }
+        Types.InAssembly(TemplateAssemblies.Features).ShouldNot()
+            .HaveDependencyOnAny(
+                "BccCode.Template.Api",
+                "Yarp.ReverseProxy",
+                "Microsoft.AspNetCore.Authentication",
+                "Microsoft.IdentityModel",
+                "Google.Cloud",
+                "Wolverine.Pubsub",
+                "Wolverine.Postgresql")
+            .GetResult().FailingTypes.Select(t => t.FullName).Should().BeNullOrEmpty();
     }
 
     /// <summary>
     /// Serverless style (no CPU between requests): nothing runs in the background. Messages are delivered by the outbox, Pub/Sub push
-    /// and the durability pass (ADR 0007), all of them HTTP requests; a hosted service would only run while an instance is awake.
+    /// and the durability pass (ADR 0024), all of them HTTP requests; a hosted service would only run while an instance is awake.
+    /// The one exception starts the BCC PubSub listeners once, at startup: a listener polls nothing and only receives what the push
+    /// endpoint hands it (<c>BccPubSubListenerStarter</c>).
     /// </summary>
     [Fact]
-    public void Nothing_runs_in_the_background() =>
-        TemplateAssemblies.All.SelectMany(a => a.GetTypes()).Where(t => typeof(IHostedService).IsAssignableFrom(t)).Should().BeEmpty();
+    public void Nothing_runs_in_the_background()
+    {
+        TemplateAssemblies.All.SelectMany(a => a.GetTypes()).Where(t => typeof(IHostedService).IsAssignableFrom(t))
+            .Where(t => t.Name != "BccPubSubListenerStarter").Should().BeEmpty();
+    }
 }

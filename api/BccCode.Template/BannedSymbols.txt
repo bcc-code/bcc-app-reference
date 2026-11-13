@@ -1,0 +1,10 @@
+P:System.DateTime.Now;Inject TimeProvider and call GetUtcNow() (standard 11.7)
+P:System.DateTime.UtcNow;Inject TimeProvider and call GetUtcNow() (standard 11.7)
+P:System.DateTime.Today;Inject TimeProvider and call GetUtcNow() (standard 11.7)
+P:System.DateTimeOffset.Now;Inject TimeProvider and call GetUtcNow() (standard 11.7)
+P:System.DateTimeOffset.UtcNow;Inject TimeProvider and call GetUtcNow() (standard 11.7)
+P:System.TimeProvider.System;Inject TimeProvider: only the host composition root may use the system clock, so tests control the time
+T:Wolverine.Attributes.LocalQueueAttribute;Under ServerlessWithOutbox nothing runs on in-process queues and no message is routed to one (ADR 0024): an internal message goes to the Pub/Sub topic, or locally to the durable inbox
+M:Wolverine.WolverineOptions.LocalQueue(System.String);A local queue is not routed to under ServerlessWithOutbox (ADR 0024)
+M:Wolverine.Configuration.IPublishToExpression.ToLocalQueue(System.String);A local queue is not routed to under ServerlessWithOutbox (ADR 0024)
+M:Wolverine.Configuration.PublishingExpression.ToLocalQueue(System.String);A local queue is not routed to under ServerlessWithOutbox (ADR 0024)

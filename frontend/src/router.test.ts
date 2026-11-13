@@ -1,12 +1,17 @@
 import { QueryClient } from '@tanstack/vue-query'
 import { createMemoryHistory } from 'vue-router'
-import { describe, expect, it } from 'vitest'
-import { meQueryOptions } from '@/features/session/me'
+import { describe, expect, it, vi } from 'vitest'
+import { usersQueries } from '@/users/queries'
 import { createAppRouter } from './router'
+
+// The router loads the page it lets through, and a page with the component library takes seconds to load in jsdom. The
+// guard decides before that, so an empty page stands in.
+vi.mock('@/notes/NoteCreatePage.vue', () => ({ default: { render: () => null } }))
+vi.mock('@/notes/NoteHistoryPage.vue', () => ({ default: { render: () => null } }))
 
 function routerFor(roles: string[]) {
   const queryClient = new QueryClient()
-  queryClient.setQueryData(meQueryOptions().queryKey, { displayName: 'Test User', roles })
+  queryClient.setQueryData(usersQueries.me().queryKey, { displayName: 'Test User', roles })
   return createAppRouter(queryClient, createMemoryHistory())
 }
 
@@ -33,5 +38,7 @@ describe('router', () => {
     const router = routerFor([])
     await router.push('/notes/new')
     expect(router.currentRoute.value.path).toBe('/notes/new')
+    await router.push('/notes/n-1/history')
+    expect(router.currentRoute.value.path).toBe('/notes/n-1/history')
   })
 })

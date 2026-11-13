@@ -30,7 +30,7 @@ builder.Services.AddOpenIddict()
             .SetTokenEndpointUris("/connect/token")
             .SetEndSessionEndpointUris("/connect/endsession");
         o.AllowAuthorizationCodeFlow();
-        o.RegisterScopes("openid", "profile", "email");
+        o.RegisterScopes("openid", "profile", "email", "mfa");
         o.DisableAccessTokenEncryption();
         // Keys live in memory: tokens from a previous run are rejected, which is right for a mock.
         o.AddEphemeralEncryptionKey().AddEphemeralSigningKey();

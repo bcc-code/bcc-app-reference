@@ -1,19 +1,21 @@
 <Solution>
   <Folder Name="/Application/">
     <Project Path="api/AppHost/AppHost.csproj" />
-    <Project Path="api/BccCode.Template.Api.EfCore/BccCode.Template.Api.EfCore.csproj" />
-    <Project Path="api/BccCode.Template.Api.Marten/BccCode.Template.Api.Marten.csproj" />
-    <Project Path="api/BccCode.Template.Web/BccCode.Template.Web.csproj" />
+    <Project Path="api/BccCode.Template.Api/BccCode.Template.Api.csproj" />
     <Project Path="api/ServiceDefaults/ServiceDefaults.csproj" />
   </Folder>
+  <Folder Name="/Domain/">
+    <Project Path="api/BccCode.Template/BccCode.Template.csproj" />
+  </Folder>
   <Folder Name="/Tests/">
+    <Project Path="api/tests/BccCode.Template.Tests/BccCode.Template.Tests.csproj" />
+    <Project Path="api/tests/BccCode.Template.IntegrationTests/BccCode.Template.IntegrationTests.csproj" />
     <Project Path="api/tests/BccCode.Template.ArchitectureTests/BccCode.Template.ArchitectureTests.csproj" />
-    <Project Path="api/tests/BccCode.Template.Api.EfCore.Tests/BccCode.Template.Api.EfCore.Tests.csproj" />
-    <Project Path="api/tests/BccCode.Template.Api.Marten.Tests/BccCode.Template.Api.Marten.Tests.csproj" />
-    <Project Path="api/tests/BccCode.Template.Web.Tests/BccCode.Template.Web.Tests.csproj" />
+    <Project Path="api/tests/BccCode.Template.E2eTests/BccCode.Template.E2eTests.csproj" />
   </Folder>
   <Folder Name="/Utils/">
     <Project Path="api/OidcMock/OidcMock.csproj" />
+    <Project Path="api/BccCode.Template.TestData/BccCode.Template.TestData.csproj" />
   </Folder>
   <Folder Name="/Files/">
     <File Path="Directory.Build.props" />

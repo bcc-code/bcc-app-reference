@@ -1,23 +1,23 @@
 <Project>
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Analyzer and code style rules fail the build; severities for individual rules are in .editorconfig. -->
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- IDE0005 (unnecessary using) only runs in the build when the XML documentation file is generated. Doc comments are
+         not required on every public member, so CS1591 is off. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
-  <!-- The Aspire SDK adds packages for the host OS (Aspire.Dashboard.Sdk.<rid>), so a lock file for the AppHost cannot
-       match on both Windows and the Linux runners. The AppHost is not deployed. -->
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'AppHost'">
+  <!-- The Aspire SDK adds packages for the host OS (Aspire.Dashboard.Sdk.<rid>), so a lock file for the AppHost, or for the E2E tests
+       that reference it, cannot match on both Windows and the Linux runners. Neither is deployed. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'AppHost' or '$(MSBuildProjectName)' == 'BccCode.Template.E2eTests'">
     <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
-  </PropertyGroup>
-  <!-- The deploy workflow restores the deployed graph with -r linux-x64; a lock file made without it fails locked mode
-       (NU1004). Only the deployed projects: on a test project the RID changes how some test packages find their assets. -->
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BccCode.Template.Api.Marten' or '$(MSBuildProjectName)' == 'BccCode.Template.Api.EfCore' or '$(MSBuildProjectName)' == 'BccCode.Template.Web' or '$(MSBuildProjectName)' == 'ServiceDefaults'">
-    <RuntimeIdentifiers>linux-x64</RuntimeIdentifiers>
   </PropertyGroup>
   <PropertyGroup Condition="'$(CI)' == 'true' or '$(ContinuousIntegrationBuild)' == 'true'">
     <!-- CI (GitHub Actions sets CI=true) restores exactly what packages.lock.json says. -->

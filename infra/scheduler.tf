@@ -1,22 +1,13 @@
-# Cloud Scheduler calls the Wolverine durability pass every minute (POST /internal/durability/pass). The pass sends outbox
-# rows whose inline send failed and deletes expired envelopes and dead letters. It runs as a request because Cloud Run
-# gives an instance CPU only while it serves one. The endpoint answers 500 when the pass failed, which Cloud Scheduler
-# logs as an error (alert in monitoring.tf).
+# Cloud Scheduler calls the internal endpoints (docs/adrs/0024-wolverine-serverless-with-outbox-and-pubsub-push.md). They are scheduled requests because Cloud Run gives an instance
+# CPU only while it serves one, so the app runs no timers of its own.
 
-# Identity the Cloud Scheduler job signs its OIDC token as. /internal/durability accepts only tokens from it.
+# Identity the jobs sign their OIDC token as. /internal/scheduler routes accept only tokens from it.
 resource "google_service_account" "scheduler" {
-  account_id   = "sa-${local.app}-scheduler-${local.env}"
+  account_id   = "sa-${local.app}-sched-${local.env}"
   display_name = "${local.app} Cloud Scheduler to the API (${local.env})"
 }
 
-# Creating a job with an OIDC token requires actAs on the token's service account.
-resource "google_service_account_iam_member" "terraform_acts_as_scheduler" {
-  service_account_id = google_service_account.scheduler.name
-  role               = "roles/iam.serviceAccountUser"
-  member             = local.terraform_sa_member
-}
-
-# The Cloud Scheduler service agent mints the OIDC tokens for the scheduler service account.
+# The Cloud Scheduler service agent mints the OIDC tokens for the scheduler account.
 resource "google_service_account_iam_member" "scheduler_token_creator" {
   service_account_id = google_service_account.scheduler.name
   role               = "roles/iam.serviceAccountTokenCreator"
@@ -25,18 +16,12 @@ resource "google_service_account_iam_member" "scheduler_token_creator" {
   depends_on = [google_project_service.services]
 }
 
-resource "google_cloud_run_v2_service_iam_member" "scheduler_invoker" {
-  name     = google_cloud_run_v2_service.api.name
-  location = google_cloud_run_v2_service.api.location
-  role     = "roles/run.invoker"
-  member   = "serviceAccount:${google_service_account.scheduler.email}"
-}
-
+# Sends outbox rows whose inline send failed, releases due scheduled messages and deletes expired envelopes.
 resource "google_cloud_scheduler_job" "durability_pass" {
   name             = "${local.app}-durability-pass-${local.env}"
-  region           = var.region # the API's region
+  region           = local.region # Cloud Scheduler supports europe-west4
   schedule         = "* * * * *"
-  time_zone        = "Etc/UTC"
+  time_zone        = "Europe/Oslo"
   attempt_deadline = "60s"
 
   # The next minute is the retry.
@@ -46,7 +31,7 @@ resource "google_cloud_scheduler_job" "durability_pass" {
 
   http_target {
     http_method = "POST"
-    # maxDuration (seconds) bounds the pass well inside attempt_deadline, so a slow pass ends cleanly instead of being cut off.
+    # maxDuration (seconds) ends a slow pass cleanly, well inside attempt_deadline.
     uri = "${google_cloud_run_v2_service.api.uri}/internal/durability/pass?maxDuration=30"
 
     oidc_token {
@@ -57,7 +42,6 @@ resource "google_cloud_scheduler_job" "durability_pass" {
 
   depends_on = [
     google_project_service.services,
-    google_service_account_iam_member.terraform_acts_as_scheduler,
     google_service_account_iam_member.scheduler_token_creator,
   ]
 }

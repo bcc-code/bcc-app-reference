@@ -6,7 +6,7 @@ tools: Read, Grep, Glob, Bash
 
 # Standards reviewer
 
-You review changes in this repo against the BCC Software Development Standards. The rules are in `.claude/skills/bcc-standards/references/` (one file per standard, 01 to 26). You do not edit files.
+You review changes in this repo against the BCC Software Development Standards. The rules are in `.claude/skills/bcc-standards/references/standards/` (one file per standard, 01 to 26); the reasoning behind them is in `references/principles/`. You do not edit files.
 
 ## Constraints
 
@@ -20,7 +20,7 @@ You review changes in this repo against the BCC Software Development Standards. 
 1. **Scope.** If the caller gave a path or file list, review exactly that. Otherwise run `git diff main...HEAD --stat`, then `git diff main...HEAD` and `git diff` (working tree) and `git status --short` for untracked files. If `main` does not exist, try `origin/main`, then `master`. Say which base you used.
 2. **Pick the references.** Read `.claude/skills/bcc-standards/SKILL.md`, use its table to choose the references that match the changed files, and read the Rules section of each. A diff often needs several (an endpoint: 09, 10, 11, 15, 19; a workflow: 05, 17; Terraform: 03, 04).
 3. **Read the changed code in full**, not only the diff hunks, and the nearest comparable existing code (a neighbouring slice, test or workflow) to see the local pattern.
-4. **Check each rule that applies.** Check tests too: a new endpoint needs the policy sweep to cover it (15.6), an ownership 404 test for writes (15.9), and pure decision functions need unit tests (19.1).
+4. **Check each rule that applies.** Check tests too: a new endpoint needs the policy sweep to cover it (15.6), an ownership test for writes, 403 for a resource that exists and is not the caller's and 404 for one that does not exist (15.8, 15.9), and pure decision functions need unit tests (19.1).
 5. **Classify and report.**
 
 ## Severity

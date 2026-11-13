@@ -1,7 +1,5 @@
-# A preview environment per pull request that carries the "preview" label (standard 07). See docs/pr-previews.md.
-#
-# STARTING POINT. It works end to end for the API service only. Search for TODO: the database, the migration job, the
-# OIDC mock and ingress restriction are still to be added in infra/preview/ before a preview is usable.
+# A preview of each PR with the `preview` label, in the landing zone's `dev` environment, one Postgres schema per PR
+# (ADR 0027, standard 07).
 name: PR preview
 
 # Quoted: an unquoted " #" starts a YAML comment.
@@ -11,327 +9,359 @@ on:
   # Deploys. A conflicted PR has no merge commit, so these events do not run for it.
   pull_request:
     types: [labeled, synchronize, reopened]
-  # Teardowns, from the base branch so they run for conflicted PRs too. Secrets reach fork PRs here, so this path must
-  # never check out or run PR code (standard 07 rule 14).
+  # Teardowns, from the base branch so they run for conflicted PRs too. Secrets reach fork PRs here: this path must never
+  # check out or run PR code.
   pull_request_target:
     types: [unlabeled, closed]
   # Manual destroy of an orphaned preview.
   workflow_dispatch:
     inputs:
       pr_number:
-        description: Number of the PR whose preview environment to destroy
+        description: Number of the PR whose preview to destroy
         required: true
         type: string
 
 permissions:
   contents: read
 
-# One run per PR, never cancelled: cancelling in the middle of an apply leaves the Terraform state locked.
+# One run per PR, never cancelled: a cancelled apply leaves the Terraform state locked.
 concurrency:
-  group: preview-pr-${{ github.event.pull_request.number || inputs.pr_number }}
+  group: preview-pr${{ github.event.pull_request.number || inputs.pr_number }}
   cancel-in-progress: false
 
-env:
-  CI: 'true'
-  DOTNET_NOLOGO: true
-  DOTNET_CLI_TELEMETRY_OPTOUT: true
-  # The API project that is built into the image; scripts/init-app.ps1 rewrites it (template:init-note)
-  API_PROJECT: api/BccCode.Template.Api.Marten
-
 jobs:
-  # Decides what the event does; every other job keys off its outputs.
+  # Every other job keys off its outputs (standard 07.2). The logic and its tests are in .github/scripts.
   decide:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: read # read the sticky comment
     outputs:
       deploy: ${{ steps.d.outputs.deploy }}
       destroy: ${{ steps.d.outputs.destroy }}
+      first_time: ${{ steps.d.outputs.first_time }}
       component: ${{ steps.d.outputs.component }}
       tag: ${{ steps.d.outputs.tag }}
-      first_time: ${{ steps.d.outputs.first_time }}
-      pr: ${{ steps.d.outputs.pr }}
     steps:
+      # On pull_request_target the default ref is the base branch, so the script is never the PR's.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
       - id: d
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT: ${{ github.event_name }}
           ACTION: ${{ github.event.action }}
-          # The label that changed (labeled/unlabeled only).
           LABEL: ${{ github.event.label.name }}
-          # Whether the PR has the label now.
           LABELLED: ${{ contains(github.event.pull_request.labels.*.name, 'preview') }}
           SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          STATE: ${{ github.event.pull_request.state }}
           PR: ${{ github.event.pull_request.number || inputs.pr_number }}
           SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-
-          deploy=false
-          destroy=false
-          first_time=false
-
-          if [[ "$EVENT" == "workflow_dispatch" ]]; then
-            # A typo would target a fresh empty Terraform workspace instead of the preview (standard 07 rule 15).
-            if ! [[ "$PR" =~ ^[0-9]+$ ]]; then
-              echo "pr_number must be a plain PR number, got '$PR'" >&2
-              exit 1
-            fi
-            destroy=true
-          # Forks get no OIDC token, so they can neither deploy nor destroy (standard 07 rule 4).
-          elif [[ "$SAME_REPO" == "true" ]]; then
-            case "$ACTION" in
-              labeled)
-                # Any other label must not reseed: that drops the preview's database (standard 07 rule 3).
-                if [[ "$LABEL" == "preview" ]]; then
-                  deploy=true
-                  first_time=true      # brand-new database
-                fi
-                ;;
-              unlabeled)
-                if [[ "$LABEL" == "preview" ]]; then
-                  destroy=true
-                fi
-                ;;
-              reopened)
-                # Closing destroyed the database, so reseed.
-                if [[ "$LABELLED" == "true" ]]; then
-                  deploy=true
-                  first_time=true
-                fi
-                ;;
-              synchronize)
-                if [[ "$LABELLED" == "true" ]]; then
-                  deploy=true          # new image, existing database: no reseed
-                else
-                  # A queued teardown can be displaced by this push. Destroy if the sticky comment still says the
-                  # preview is active. Not piped into grep -q: SIGPIPE with pipefail.
-                  comments=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" --paginate --jq '.[].body' || true)
-                  if grep -qF '<!-- template-preview:active -->' <<<"$comments"; then
-                    destroy=true
-                  fi
-                fi
-                ;;
-              closed)
-                if [[ "$LABELLED" == "true" ]]; then
-                  destroy=true
-                fi
-                ;;
-            esac
+          ACTIVE=false
+          # Only read when it can lead to a destroy (see preview-decide.sh).
+          if [ "$EVENT" != workflow_dispatch ] && [ "$SAME_REPO" = true ] && { [ "$LABELLED" != true ] || [ "$STATE" = closed ]; }; then
+            # Not piped into grep -q: SIGPIPE with pipefail.
+            comments=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+              --jq '.[] | select(.user.login == "github-actions[bot]") | .body')
+            if grep -qF '<!-- template-preview:active -->' <<<"$comments"; then ACTIVE=true; fi
           fi
-
-          # pull_request_target has secrets even for forks; it must never deploy PR code.
-          if [[ "$EVENT" == "pull_request_target" && "$deploy" == "true" ]]; then
-            echo "refusing to deploy from a pull_request_target run" >&2
-            exit 1
-          fi
-
+          export ACTIVE
+          decision=$(bash .github/scripts/preview-decide.sh)
+          echo "$decision" >> "$GITHUB_OUTPUT"
           {
-            echo "deploy=$deploy"
-            echo "destroy=$destroy"
-            echo "first_time=$first_time"
-            echo "component=pr${PR}"
-            echo "tag=pr${PR}-${SHA}"
-            echo "pr=${PR}"
-          } >> "$GITHUB_OUTPUT"
+            echo "event=$EVENT action=${ACTION:-none} label=${LABEL:-none} active=$ACTIVE"
+            echo
+            echo "$decision"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-          echo "event=$EVENT action=${ACTION:-none} label=${LABEL:-none} -> deploy=$deploy destroy=$destroy first_time=$first_time component=pr${PR}" >> "$GITHUB_STEP_SUMMARY"
-
-  # Terraform needs the image to exist before it creates the revision.
+  # Untrusted PR code: read-only, no secrets (build-images.yml).
   build:
     needs: decide
     if: needs.decide.outputs.deploy == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    # A separate GitHub environment without a branch restriction: previews run PR code (standard 07 rule 21).
-    environment: preview
     permissions:
       contents: read
-      id-token: write
-    env:
-      TAG: ${{ needs.decide.outputs.tag }}
-      REGISTRY_HOST: ${{ vars.GCP_REGION }}-docker.pkg.dev
-      REPOSITORY_PATH: ${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPOSITORY }}
+    uses: ./.github/workflows/build-images.yml
+    with:
+      ref: ${{ github.event.pull_request.head.sha }}
+      tag: ${{ needs.decide.outputs.tag }}
+
+  # Terraform needs the images to exist before it creates the revisions. Assets are not uploaded: a preview serves them
+  # from the image.
+  push:
+    needs: [decide, build]
+    if: needs.decide.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The landing zone's dev environment holds PROPS, GCP_PROJECT_ID and sa-gha-cicd's WIF binding, as for terraform.yml.
+    # No GitHub deployment here: the deployment job records one per PR in `preview`.
+    environment:
+      name: dev
+      deployment: false
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation
     outputs:
-      api_image: ${{ steps.push.outputs.api_image }}
+      api_image: ${{ steps.push.outputs.api }}
+      oidcmock_image: ${{ steps.push.outputs.oidcmock }}
+    env:
+      # The location Terraform uses (props.gcp.location), so the registry and the URLs agree with infra/preview.
+      REGION: ${{ fromJSON(vars.PROPS).gcp.location }}
+      # ar-bcc-template-<app_environment>, as infra/preview-shared names it.
+      REPOSITORY: ${{ fromJSON(vars.PROPS).gcp.location }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/ar-bcc-template-${{ fromJSON(vars.PROPS).app_environment }}
+      TAG: ${{ needs.decide.outputs.tag }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup
-        with:
-          frontend: 'true'
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_PREVIEW_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ vars.GCP_WIDPP_ID_DEV }}
+          service_account: sa-gha-cicd@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
           project_id: ${{ vars.GCP_PROJECT_ID }}
       - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
-      - run: pnpm --dir frontend run build
-      # TODO: the hashed assets of a preview are not uploaded to the bucket, so the preview serves them from the image only
-      # if the API does so. Decide whether previews use the bucket or a copy inside the image.
-      - name: Bake index.html into the image
-        run: mkdir -p "$API_PROJECT/wwwroot" && cp -r frontend/dist/. "$API_PROJECT/wwwroot/"
-      # Same as deploy.yml: the Release image asserts that Wolverine's pre-generated code exists and fails at startup without
-      # it. The settings only let the host build; nothing connects to a database.
-      - name: Pre-generate the Wolverine code
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: api
+          path: ${{ runner.temp }}/images
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: oidcmock
+          path: ${{ runner.temp }}/images
+      - name: Load, tag and push the images
+        id: push
         env:
-          ASPNETCORE_ENVIRONMENT: Development
-          ConnectionStrings__template: Host=localhost;Database=x
-        run: |
-          dotnet build "$API_PROJECT" --configuration Debug
-          dotnet run --project "$API_PROJECT" --configuration Debug --no-build -- codegen write
-      - id: push
-        name: Publish the container image
+          IMAGES: ${{ runner.temp }}/images
         run: |
           set -euo pipefail
-          export SDK_CONTAINER_REGISTRY_UNAME=oauth2accesstoken
-          export SDK_CONTAINER_REGISTRY_PWORD="$(gcloud auth print-access-token)"
-          dotnet publish "$API_PROJECT" --configuration Release --runtime linux-x64 --self-contained false \
-            /t:PublishContainer \
-            -p:ContainerRegistry="$REGISTRY_HOST" \
-            -p:ContainerRepository="$REPOSITORY_PATH/template-api" \
-            -p:ContainerImageTags="\"$TAG\""
-          echo "api_image=$REGISTRY_HOST/$REPOSITORY_PATH/template-api:$TAG" >> "$GITHUB_OUTPUT"
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+          for name in api oidcmock; do
+            docker load -i "$IMAGES/$name.tar"
+            docker tag "bcc-template-$name:$TAG" "$REPOSITORY/$name:$TAG"
+            docker push "$REPOSITORY/$name:$TAG"
+            # The registry digest from the push itself, as in deploy.yml.
+            digest=$(docker inspect --format='{{range .RepoDigests}}{{println .}}{{end}}' "$REPOSITORY/$name:$TAG" \
+              | grep "^$REPOSITORY/$name@" | cut -d@ -f2)
+            test -n "$digest"
+            echo "$name=$REPOSITORY/$name@$digest" >> "$GITHUB_OUTPUT"
+          done
 
-  provision:
-    needs: [decide, build]
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment: preview
+  # The API's account, its database group membership and its key grant, applied alone while the images build. A new
+  # membership takes minutes to reach Cloud SQL, and the API stops on startup when it cannot connect. Later runs change
+  # nothing here. The images are not known yet and the targeted resources do not use them.
+  access:
+    needs: decide
+    if: needs.decide.outputs.deploy == 'true'
+    # @main, not a SHA: see provision.
+    uses: bcc-code/bcc-platform-deploy/.github/workflows/terraform.yml@main
     permissions:
-      contents: read
-      id-token: write
-    env:
-      COMPONENT: ${{ needs.decide.outputs.component }}
-      PR: ${{ needs.decide.outputs.pr }}
-      API_IMAGE: ${{ needs.build.outputs.api_image }}
-      STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
-        with:
-          terraform_wrapper: false
-      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
-        with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_PREVIEW_SERVICE_ACCOUNT }}
-      - name: Apply into workspace pr<N>
-        env:
-          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          REGION: ${{ vars.GCP_REGION }}
-        run: |
-          set -euo pipefail
-          cd infra/preview
-          terraform init -input=false -backend-config="bucket=$STATE_BUCKET" -backend-config="prefix=template/preview"
-          terraform workspace select -or-create "$COMPONENT"
-          terraform apply -input=false -auto-approve -no-color \
-            -var "project_id=$PROJECT_ID" -var "region=$REGION" -var "pr_number=$PR" -var "api_image=$API_IMAGE"
+      id-token: write # requesting the JWT
+      contents: read # actions/checkout in the called workflow
+    with:
+      component-name: ${{ needs.decide.outputs.component }}
+      environment: dev
+      path: ./infra/preview
+      action: apply
+      deployment-targets: google_cloud_identity_group_membership.api,google_kms_crypto_key_iam_member.api_data_protection
+      terraform-vars: |-
+        pr_number=${{ github.event.pull_request.number }}
+        api_image=unused
+        oidcmock_image=unused
 
-  # Runs after every apply: nothing else migrates a preview's database. Only the first run resets and seeds it.
-  # TODO: needs the migration job and database in infra/preview/. Set the repository variable PREVIEW_HAS_DATABASE to
-  # 'true' once they exist.
-  migrate:
-    needs: [decide, provision]
-    if: needs.decide.outputs.deploy == 'true' && vars.PREVIEW_HAS_DATABASE == 'true'
+  # After the data: the API checks its tables on startup, so its first revision fails without the schema. After access,
+  # so the API's database access has had the build's minutes to take effect.
+  provision:
+    needs: [decide, push, data, access]
+    if: needs.decide.outputs.deploy == 'true'
+    # @main, not a SHA (exception in standards 03.5 and 17.7): the platform's GCP workload identity trusts the job_workflow_ref
+    # of bcc-platform-deploy at refs/heads/main, so a commit pin is refused (403 getOpenIdToken). Same as infra.yml.
+    uses: bcc-code/bcc-platform-deploy/.github/workflows/terraform.yml@main
+    permissions:
+      id-token: write # requesting the JWT
+      contents: read # actions/checkout in the called workflow
+    with:
+      component-name: ${{ needs.decide.outputs.component }}
+      environment: dev
+      path: ./infra/preview
+      action: apply
+      terraform-vars: |-
+        pr_number=${{ github.event.pull_request.number }}
+        api_image=${{ needs.push.outputs.api_image }}
+        oidcmock_image=${{ needs.push.outputs.oidcmock_image }}
+
+  # The schema before every apply, as deploy.yml does before its rollout; reset and seed only on first deploy and reopen,
+  # or when the schema is missing (standard 07.7). The images run on the runner through the Cloud SQL Auth Proxy. It
+  # needs only the shared part (infra/preview-shared), not this PR's Terraform.
+  data:
+    needs: [decide, push]
+    if: needs.decide.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: preview
+    # The landing zone's dev environment holds PROPS, GCP_PROJECT_ID and sa-gha-cicd's WIF binding, as for terraform.yml.
+    # No GitHub deployment here: the deployment job records one per PR in `preview`.
+    environment:
+      name: dev
+      deployment: false
     permissions:
       contents: read
-      id-token: write
-    steps:
-      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
-        with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_PREVIEW_SERVICE_ACCOUNT }}
-          project_id: ${{ vars.GCP_PROJECT_ID }}
-      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
-      - name: Execute the migration job
-        env:
-          JOB: template-migrate-${{ needs.decide.outputs.component }}
-          FIRST_TIME: ${{ needs.decide.outputs.first_time }}
-          REGION: ${{ vars.GCP_REGION }}
-        run: |
-          set -euo pipefail
-          # TODO: seeding. On the first run (FIRST_TIME=true) the job should also reset and seed the database, with an
-          # override such as --container app --update-env-vars SEEDER__RESETFIRST=true. The seeder and its allowlist
-          # (standard 02, which includes "preview") do not exist in the template yet, so both runs are plain migrations.
-          echo "first_time=$FIRST_TIME"
-          gcloud run jobs execute "$JOB" --region "$REGION" --wait
-
-  # After provision (and migrate when it runs), so the posted URL is ready to use.
-  comment:
-    needs: [decide, provision, migrate]
-    if: always() && needs.decide.outputs.deploy == 'true' && needs.provision.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped')
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment: preview
-    permissions:
-      contents: read
-      id-token: write
-      pull-requests: write
+      id-token: write # Workload Identity Federation
     outputs:
-      api_url: ${{ steps.urls.outputs.api }}
+      api_url: ${{ steps.url.outputs.api_url }}
+    env:
+      PROJECT: ${{ vars.GCP_PROJECT_ID }}
+      # The location Terraform uses (props.gcp.location); the app URL is built from it.
+      REGION: ${{ fromJSON(vars.PROPS).gcp.location }}
+      TAG: ${{ needs.decide.outputs.tag }}
+      COMPONENT: ${{ needs.decide.outputs.component }}
     steps:
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_PREVIEW_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ vars.GCP_WIDPP_ID_DEV }}
+          service_account: sa-gha-cicd@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
           project_id: ${{ vars.GCP_PROJECT_ID }}
       - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
-      - name: Resolve the URL
-        id: urls
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: api
+          path: ${{ runner.temp }}/images
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: testdata
+          path: ${{ runner.temp }}/images
+      - name: Apply the schema and seed
         env:
-          COMPONENT: ${{ needs.decide.outputs.component }}
-          REGION: ${{ vars.GCP_REGION }}
-          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          IMAGES: ${{ runner.temp }}/images
+          FIRST_TIME: ${{ needs.decide.outputs.first_time }}
+          DB_NAME: ${{ fromJSON(vars.PROPS).shared_db.db_name }}
+          DB_CONNECTION_NAME: ${{ fromJSON(vars.PROPS).shared_db.connection_name }}
+          # The owner role of the database has the database's name, created by the landing zone.
+          DB_OWNER_ROLE: ${{ fromJSON(vars.PROPS).shared_db.db_name }}
+          # Same version and hash as deploy.yml.
+          PROXY_VERSION: v2.26.2
+          PROXY_SHA256: 787d23b4b396186f307b6b274c94099d25b15a81b7e60c91ceed18c07558e9d7
         run: |
           set -euo pipefail
-          # Deterministic (standard 07 rule 10). Must match the service name in infra/preview/main.tf.
-          num=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
-          echo "api=https://template-api-${COMPONENT}-${num}.${REGION}.run.app" >> "$GITHUB_OUTPUT"
+          docker load -i "$IMAGES/api.tar"
+          docker load -i "$IMAGES/testdata.tar"
+          # The schema is pr<N> (infra/preview, output `schema`).
+          schema="$COMPONENT"
+          db_user="sa-gha-cicd@$PROJECT.iam"
+          connection="Host=127.0.0.1;Port=5432;Database=$DB_NAME;Username=$db_user"
+          curl -sSfLo cloud-sql-proxy "https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/$PROXY_VERSION/cloud-sql-proxy.linux.amd64"
+          echo "$PROXY_SHA256  cloud-sql-proxy" | sha256sum --check --strict
+          chmod +x cloud-sql-proxy
+          ./cloud-sql-proxy --auto-iam-authn --address 127.0.0.1 --port 5432 "$DB_CONNECTION_NAME" &
+          proxy_pid=$!
+          trap 'kill "$proxy_pid" 2>/dev/null || true' EXIT
+          ready=false
+          for _ in $(seq 1 30); do
+            if nc -z 127.0.0.1 5432; then ready=true; break; fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            echo "::error::The Cloud SQL Auth Proxy did not start listening on 5432."; exit 1
+          fi
+          sql() {
+            psql -w -v ON_ERROR_STOP=1 -c "$1" "host=127.0.0.1 port=5432 dbname=$DB_NAME user=$db_user"
+          }
+          jasper() {
+            docker run --rm --network host \
+              -e Gcp__ProjectId="$PROJECT" \
+              -e Persistence__Schema="$schema" \
+              -e ConnectionStrings__template="$connection" \
+              "bcc-template-api:$TAG" jasper "$@"
+          }
+          # Cloud SQL can take minutes to see the CI account's group membership after the first apply.
+          for attempt in 1 2 3 4 5 6; do
+            if sql "SELECT 1" >/dev/null; then break; fi
+            if [ "$attempt" = 6 ]; then exit 1; fi
+            sleep $((attempt * 15))
+          done
+          reset="$FIRST_TIME"
+          # A push can replace a queued first deploy in the concurrency group; the schema is then missing.
+          exists=$(psql -w -tA -v ON_ERROR_STOP=1 -c "SELECT 1 FROM pg_namespace WHERE nspname = '$schema'" \
+            "host=127.0.0.1 port=5432 dbname=$DB_NAME user=$db_user")
+          if [ -z "$exists" ]; then reset=true; fi
+          if [ "$reset" = true ]; then
+            sql "DROP SCHEMA IF EXISTS \"$schema\" CASCADE"
+            sql "CREATE SCHEMA \"$schema\""
+          fi
+          jasper db-apply
+          sql "REASSIGN OWNED BY CURRENT_USER TO \"$DB_OWNER_ROLE\""
+          jasper db-assert
+          if [ "$reset" = true ]; then
+            # Once mode starts Kestrel briefly; a random loopback port cannot clash with the proxy on the host network.
+            docker run --rm --network host \
+              -e ASPNETCORE_ENVIRONMENT=preview \
+              -e ASPNETCORE_URLS=http://127.0.0.1:0 \
+              -e Seeder__Once=true \
+              -e Gcp__ProjectId="$PROJECT" \
+              -e Persistence__Schema="$schema" \
+              -e ConnectionStrings__template="$connection" \
+              "bcc-template-testdata:$TAG"
+          fi
+      # Same form as api_url in infra/preview/main.tf.
+      - name: Resolve the app URL
+        id: url
+        run: |
+          set -euo pipefail
+          number=$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')
+          echo "api_url=https://bcc-template-api-$COMPONENT-$number.$REGION.run.app" >> "$GITHUB_OUTPUT"
+
+  # After the apply, so the posted URL is ready to use.
+  comment:
+    needs: [decide, data, provision]
+    if: needs.decide.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write # the sticky comment
+    steps:
       - name: Upsert the sticky comment
         env:
           GH_TOKEN: ${{ github.token }}
-          PR: ${{ needs.decide.outputs.pr }}
-          MARKER: "<!-- template-preview -->"
-          API: ${{ steps.urls.outputs.api }}
+          PR: ${{ github.event.pull_request.number }}
           SHA: ${{ github.event.pull_request.head.sha }}
+          API_URL: ${{ needs.data.outputs.api_url }}
+          MARKER: "<!-- template-preview -->"
         run: |
           set -euo pipefail
-          # Unquoted heredoc: escape every backtick.
+          # Unquoted heredoc: every backtick is escaped.
           body=$(cat <<EOF
           ${MARKER}
           <!-- template-preview:active -->
-          ### Preview environment
+          ### Preview
 
           | | |
           |---|---|
-          | **App** | ${API} |
+          | **App** | ${API_URL} |
           | **Commit** | \`${SHA}\` |
 
-          Log in through the preview's own mock identity provider. Any test persona works. The preview holds generated test
-          data only and must never receive production or personal data.
+          Sign in with any persona on the mock's login page.
 
-          The environment scales to zero, so the first request after an idle spell is slow, and background jobs do not run
-          while it is idle.
+          The preview scales to zero, so the first request after an idle spell is slow while it starts. The durability pass runs every 30 minutes, so scheduled messages and retries can wait that long.
 
-          Remove the \`preview\` label or close the PR to destroy it.
+          There is no BCC PubSub: integration events are not sent.
+
+          Remove and add the \`preview\` label to reset the data. Remove the label or close the PR to destroy the preview.
           EOF
           )
-          id=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" --paginate \
-                 --jq "[.[] | select(.body | contains(\"${MARKER}\"))] | last | .id // empty" | tail -n1)
-          if [[ -n "$id" ]]; then
-            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${id}" -f body="$body" >/dev/null
+          # --jq runs per page; tail -n1 keeps one id.
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq "[.[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"$MARKER\")))] | last | .id // empty" | tail -n1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$body" >/dev/null
           else
-            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" -f body="$body" >/dev/null
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" >/dev/null
           fi
 
-  # All previews share the "preview" environment, keyed by task: Actions cannot delete environments, so one per PR would
-  # pile up in Settings (standard 07 rule 12).
+  # All previews share the GitHub environment `preview`, keyed by task (standard 07.12): Actions cannot delete
+  # environments, so per-PR ones would pile up. Not `dev`, so the records and their cleanup stay apart from the
+  # deployments terraform.yml makes there.
   deployment:
-    needs: [decide, comment]
+    needs: [decide, data, comment]
     if: needs.decide.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -344,95 +374,124 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           COMPONENT: ${{ needs.decide.outputs.component }}
           SHA: ${{ github.event.pull_request.head.sha }}
-          URL: ${{ needs.comment.outputs.api_url }}
+          URL: ${{ needs.data.outputs.api_url }}
         run: |
           set -euo pipefail
-          task="preview-${COMPONENT}"
-          # Retire earlier deployments of this PR.
-          for dep in $(gh api --paginate "repos/${GITHUB_REPOSITORY}/deployments?environment=preview&task=${task}" --jq '.[].id'); do
-            gh api -X POST "repos/${GITHUB_REPOSITORY}/deployments/${dep}/statuses" -f state=inactive >/dev/null
+          task="preview-$COMPONENT"
+          # Retire earlier deployments; auto_inactive skips transient ones.
+          for dep in $(gh api --paginate "repos/$GITHUB_REPOSITORY/deployments?environment=preview&task=$task" --jq '.[].id'); do
+            gh api -X POST "repos/$GITHUB_REPOSITORY/deployments/$dep/statuses" -f state=inactive >/dev/null
           done
-          # jq and --input: gh -F cannot send an empty array. required_contexts: [] skips waiting on checks.
-          id=$(jq -n --arg ref "$SHA" --arg task "$task" --arg desc "Preview for ${COMPONENT}" \
-                 '{ref: $ref, environment: "preview", task: $task, description: $desc,
-                   transient_environment: true, auto_merge: false, required_contexts: []}' \
-               | gh api -X POST "repos/${GITHUB_REPOSITORY}/deployments" --input - --jq '.id')
+          # jq and --input: gh -F cannot send an empty array. required_contexts: [] skips waiting on checks;
+          # auto_merge: false avoids a 409.
+          id=$(jq -n --arg ref "$SHA" --arg task "$task" --arg desc "Preview for $COMPONENT" \
+              '{ref: $ref, environment: "preview", task: $task, description: $desc,
+                transient_environment: true, auto_merge: false, required_contexts: []}' \
+            | gh api -X POST "repos/$GITHUB_REPOSITORY/deployments" --input - --jq '.id')
           jq -n --arg url "$URL" '{state: "success", environment_url: $url, auto_inactive: true}' \
-            | gh api -X POST "repos/${GITHUB_REPOSITORY}/deployments/${id}/statuses" --input - >/dev/null
+            | gh api -X POST "repos/$GITHUB_REPOSITORY/deployments/$id/statuses" --input - >/dev/null
 
-  teardown:
+  # Drops the schema before the workspace goes. No checkout: nothing from the PR runs here.
+  teardown-schema:
     needs: decide
     if: needs.decide.outputs.destroy == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment: preview
+    timeout-minutes: 10
+    # The landing zone's dev environment holds PROPS, GCP_PROJECT_ID and sa-gha-cicd's WIF binding, as for terraform.yml.
+    # No GitHub deployment here: the deployment job records one per PR in `preview`.
+    environment:
+      name: dev
+      deployment: false
     permissions:
       contents: read
-      id-token: write
-    env:
-      COMPONENT: ${{ needs.decide.outputs.component }}
-      PR: ${{ needs.decide.outputs.pr }}
-      STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      id-token: write # Workload Identity Federation
     steps:
-      # The default branch, never the PR: this job also runs from pull_request_target (standard 07 rule 14).
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
-        with:
-          terraform_wrapper: false
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_PREVIEW_SERVICE_ACCOUNT }}
-      - name: Destroy workspace pr<N>
+          workload_identity_provider: ${{ vars.GCP_WIDPP_ID_DEV }}
+          service_account: sa-gha-cicd@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+      - name: Drop the schema
         env:
-          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          REGION: ${{ vars.GCP_REGION }}
+          PROJECT: ${{ vars.GCP_PROJECT_ID }}
+          COMPONENT: ${{ needs.decide.outputs.component }}
+          DB_NAME: ${{ fromJSON(vars.PROPS).shared_db.db_name }}
+          DB_CONNECTION_NAME: ${{ fromJSON(vars.PROPS).shared_db.connection_name }}
+          # Same version and hash as deploy.yml.
+          PROXY_VERSION: v2.26.2
+          PROXY_SHA256: 787d23b4b396186f307b6b274c94099d25b15a81b7e60c91ceed18c07558e9d7
         run: |
           set -euo pipefail
-          cd infra/preview
-          terraform init -input=false -backend-config="bucket=$STATE_BUCKET" -backend-config="prefix=template/preview"
-          terraform workspace select "$COMPONENT"
-          # The image does not matter for a destroy; the variable is required to load the configuration.
-          terraform destroy -input=false -auto-approve -no-color \
-            -var "project_id=$PROJECT_ID" -var "region=$REGION" -var "pr_number=$PR" -var "api_image=unused"
-          terraform workspace select default
-          terraform workspace delete "$COMPONENT"
+          db_user="sa-gha-cicd@$PROJECT.iam"
+          curl -sSfLo cloud-sql-proxy "https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/$PROXY_VERSION/cloud-sql-proxy.linux.amd64"
+          echo "$PROXY_SHA256  cloud-sql-proxy" | sha256sum --check --strict
+          chmod +x cloud-sql-proxy
+          ./cloud-sql-proxy --auto-iam-authn --address 127.0.0.1 --port 5432 "$DB_CONNECTION_NAME" &
+          proxy_pid=$!
+          trap 'kill "$proxy_pid" 2>/dev/null || true' EXIT
+          ready=false
+          for _ in $(seq 1 30); do
+            if nc -z 127.0.0.1 5432; then ready=true; break; fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            echo "::error::The Cloud SQL Auth Proxy did not start listening on 5432."; exit 1
+          fi
+          psql -w -v ON_ERROR_STOP=1 -c "DROP SCHEMA IF EXISTS \"$COMPONENT\" CASCADE" \
+            "host=127.0.0.1 port=5432 dbname=$DB_NAME user=$db_user"
+
+  # The called workflow checks out the run's ref: the base branch on pull_request_target and workflow_dispatch, the PR's
+  # merge commit when a pull_request event destroys (a same-repo PR only, whose Terraform the deploys already applied).
+  teardown:
+    needs: [decide, teardown-schema]
+    if: needs.decide.outputs.destroy == 'true'
+    uses: bcc-code/bcc-platform-deploy/.github/workflows/terraform.yml@main
+    permissions:
+      id-token: write # requesting the JWT
+      contents: read # actions/checkout in the called workflow
+    with:
+      component-name: ${{ needs.decide.outputs.component }}
+      environment: dev
+      path: ./infra/preview
+      action: destroy
+      # Required to load the configuration; the image values do not matter for a destroy.
+      terraform-vars: |-
+        pr_number=${{ github.event.pull_request.number || inputs.pr_number }}
+        api_image=unused
+        oidcmock_image=unused
 
   teardown-comment:
     needs: [decide, teardown]
     if: always() && needs.decide.outputs.destroy == 'true' && needs.teardown.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # Job permissions replace the workflow's, so every one needed is restated.
     permissions:
       contents: read
-      pull-requests: write
+      pull-requests: write # the sticky comment
       deployments: write
     steps:
-      - name: Mark the sticky comment torn down and delete the deployments
+      - name: Mark the sticky comment destroyed and remove the deployments
         env:
           GH_TOKEN: ${{ github.token }}
-          PR: ${{ needs.decide.outputs.pr }}
-          MARKER: "<!-- template-preview -->"
+          PR: ${{ github.event.pull_request.number || inputs.pr_number }}
           COMPONENT: ${{ needs.decide.outputs.component }}
+          MARKER: "<!-- template-preview -->"
         run: |
           set -euo pipefail
-          id=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" --paginate \
-                 --jq "[.[] | select(.body | contains(\"${MARKER}\"))] | last | .id // empty" | tail -n1)
-          if [[ -n "$id" ]]; then
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq "[.[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"$MARKER\")))] | last | .id // empty" | tail -n1)
+          if [ -n "$id" ]; then
             body=$(cat <<EOF
           ${MARKER}
-          ### Preview environment destroyed
+          ### Preview destroyed
 
           Add the \`preview\` label again to create a fresh one.
           EOF
           )
-            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${id}" -f body="$body" >/dev/null
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -f body="$body" >/dev/null
           fi
           # Deactivate, then delete (DELETE requires inactive).
-          for dep in $(gh api --paginate "repos/${GITHUB_REPOSITORY}/deployments?environment=preview&task=preview-${COMPONENT}" --jq '.[].id'); do
-            gh api -X POST "repos/${GITHUB_REPOSITORY}/deployments/${dep}/statuses" -f state=inactive >/dev/null
-            gh api -X DELETE "repos/${GITHUB_REPOSITORY}/deployments/${dep}" >/dev/null
+          for dep in $(gh api --paginate "repos/$GITHUB_REPOSITORY/deployments?environment=preview&task=preview-$COMPONENT" --jq '.[].id'); do
+            gh api -X POST "repos/$GITHUB_REPOSITORY/deployments/$dep/statuses" -f state=inactive >/dev/null
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/deployments/$dep" >/dev/null
           done

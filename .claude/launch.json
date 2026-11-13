@@ -5,8 +5,8 @@
       "name": "template",
       "runtimeExecutable": "aspire",
       "runtimeArgs": ["run"],
-      "port": 18000,
-      "url": "https://template.dev.localhost:18000"
+      "port": 16000,
+      "url": "https://template.dev.localhost:16000"
     }
   ]
 }

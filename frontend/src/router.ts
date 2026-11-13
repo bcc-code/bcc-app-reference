@@ -1,33 +1,42 @@
 import type { QueryClient } from '@tanstack/vue-query'
 import { createRouter, createWebHistory, type RouterHistory } from 'vue-router'
-import { ADMIN_ROLE, hasRole, meQueryOptions } from '@/features/session/me'
+import { mayOpenStats } from '@/admin/rules'
+import type { GetMeResponse } from '@/client'
+import { queryClient as sharedQueryClient } from '@/queryClient'
+import { usersQueries } from '@/users/queries'
 
 declare module 'vue-router' {
   interface RouteMeta {
-    /** The role the page needs. The server stays the authority; this gives a clear page instead of a page full of 403s. */
-    role?: string
+    /** Served and shown without a session; nothing on the page may call an API that needs one before sign-in. */
+    public?: boolean
+    /**
+     * Role-specific page (standard 21.16): who sees it rather than the no-access page. The server stays the authority; this
+     * gives a clear page instead of a page full of 403s. The predicates are in each feature's rules.ts.
+     */
+    allowed?: (roles: readonly string[], me: GetMeResponse) => boolean
   }
 }
 
-export function createAppRouter(queryClient: QueryClient, history: RouterHistory = createWebHistory()) {
+export function createAppRouter(queryClient: QueryClient = sharedQueryClient, history: RouterHistory = createWebHistory()) {
   const router = createRouter({
     history,
     routes: [
       { path: '/', redirect: '/notes' },
-      { path: '/notes', component: () => import('@/features/notes/NotesListPage.vue') },
-      { path: '/notes/new', component: () => import('@/features/notes/NoteCreatePage.vue') },
-      { path: '/notes/:noteId/edit', component: () => import('@/features/notes/NoteEditPage.vue'), props: true },
-      { path: '/admin/stats', component: () => import('@/features/admin/StatsPage.vue'), meta: { role: ADMIN_ROLE } },
+      { path: '/notes', component: () => import('@/notes/NotesListPage.vue') },
+      { path: '/notes/new', component: () => import('@/notes/NoteCreatePage.vue') },
+      { path: '/notes/:noteId/edit', component: () => import('@/notes/NoteEditPage.vue'), props: true },
+      { path: '/notes/:noteId/history', component: () => import('@/notes/NoteHistoryPage.vue'), props: true },
+      { path: '/admin/stats', component: () => import('@/admin/StatsPage.vue'), meta: { allowed: mayOpenStats } },
       { path: '/no-access', name: 'no-access', component: () => import('@/components/NoAccessPage.vue') },
       { path: '/:pathMatch(.*)*', component: () => import('@/components/NotFoundPage.vue') },
     ],
   })
 
   router.beforeEach(async (to) => {
-    const role = to.meta.role
-    if (!role) return true
-    const me = await queryClient.ensureQueryData(meQueryOptions())
-    return hasRole(me, role) ? true : { name: 'no-access' }
+    const allowed = to.meta.allowed
+    if (!allowed) return true
+    const me = await queryClient.ensureQueryData(usersQueries.me())
+    return allowed(me.roles, me) ? true : { name: 'no-access' }
   })
 
   return router

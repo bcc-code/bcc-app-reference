@@ -1,0 +1,1136 @@
+{
+  "configuration" : { },
+  "description" : "C4 model of the BCC application template (the Notes sample)",
+  "documentation" : { },
+  "id" : 0,
+  "model" : {
+    "deploymentNodes" : [ {
+      "children" : [ {
+        "children" : [ {
+          "containerInstances" : [ {
+            "containerId" : "7",
+            "environment" : "Local",
+            "id" : "32",
+            "instanceId" : 1,
+            "properties" : {
+              "structurizr.dsl.identifier" : "local.developer.aspire.apiProcess.apiInstance"
+            },
+            "relationships" : [ {
+              "description" : "Reads and writes",
+              "destinationId" : "37",
+              "id" : "38",
+              "linkedRelationshipId" : "22",
+              "sourceId" : "32",
+              "technology" : "SQL"
+            } ],
+            "tags" : "Container Instance"
+          } ],
+          "environment" : "Local",
+          "id" : "31",
+          "instances" : "1",
+          "name" : "API process",
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.developer.aspire.apiProcess"
+          },
+          "tags" : "Element,Deployment Node",
+          "technology" : ".NET 11"
+        }, {
+          "containerInstances" : [ {
+            "containerId" : "6",
+            "environment" : "Local",
+            "id" : "34",
+            "instanceId" : 1,
+            "properties" : {
+              "structurizr.dsl.identifier" : "local.developer.aspire.vite.frontendInstance"
+            },
+            "relationships" : [ {
+              "description" : "Reads and writes data",
+              "destinationId" : "32",
+              "id" : "35",
+              "linkedRelationshipId" : "17",
+              "sourceId" : "34",
+              "technology" : "HTTPS, JSON"
+            } ],
+            "tags" : "Container Instance"
+          } ],
+          "description" : "Proxied by the API (YARP), not browsed directly.",
+          "environment" : "Local",
+          "id" : "33",
+          "instances" : "1",
+          "name" : "Vite dev server",
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.developer.aspire.vite"
+          },
+          "tags" : "Element,Deployment Node",
+          "technology" : "Node.js, Vite"
+        }, {
+          "containerInstances" : [ {
+            "containerId" : "12",
+            "environment" : "Local",
+            "id" : "37",
+            "instanceId" : 1,
+            "properties" : {
+              "structurizr.dsl.identifier" : "local.developer.aspire.postgres.databaseInstance"
+            },
+            "tags" : "Container Instance"
+          } ],
+          "environment" : "Local",
+          "id" : "36",
+          "instances" : "1",
+          "name" : "PostgreSQL container",
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.developer.aspire.postgres"
+          },
+          "tags" : "Element,Deployment Node",
+          "technology" : "Docker"
+        } ],
+        "description" : "aspire run",
+        "environment" : "Local",
+        "id" : "30",
+        "infrastructureNodes" : [ {
+          "description" : "api/OidcMock stands in for BCC Signon with test personas. No Pub/Sub locally: internal messages run from the durable inbox, and the AppHost calls the durability pass in a loop.",
+          "environment" : "Local",
+          "id" : "39",
+          "name" : "OIDC mock",
+          "properties" : {
+            "structurizr.dsl.identifier" : "local.developer.aspire.mocks"
+          },
+          "tags" : "Element,Infrastructure Node",
+          "technology" : ".NET 11"
+        } ],
+        "instances" : "1",
+        "name" : "Aspire AppHost",
+        "properties" : {
+          "structurizr.dsl.identifier" : "local.developer.aspire"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : ".NET Aspire"
+      } ],
+      "environment" : "Local",
+      "id" : "29",
+      "instances" : "1",
+      "name" : "Developer machine",
+      "properties" : {
+        "structurizr.dsl.identifier" : "local.developer"
+      },
+      "tags" : "Element,Deployment Node",
+      "technology" : "Windows, macOS or Linux"
+    }, {
+      "description" : "The platform's shared monitoring project (bcc-monitoring).",
+      "environment" : "Sandbox",
+      "id" : "40",
+      "infrastructureNodes" : [ {
+        "description" : "Writes traces to Cloud Trace (this project and the central one) and metrics to Managed Prometheus for Grafana. ADR 0026.",
+        "environment" : "Sandbox",
+        "id" : "41",
+        "name" : "OpenTelemetry collector",
+        "properties" : {
+          "structurizr.dsl.identifier" : "sandbox.monitoring.collector"
+        },
+        "tags" : "Element,Infrastructure Node",
+        "technology" : "Cloud Run"
+      } ],
+      "instances" : "1",
+      "name" : "BCC monitoring",
+      "properties" : {
+        "structurizr.dsl.identifier" : "sandbox.monitoring"
+      },
+      "tags" : "Element,Deployment Node",
+      "technology" : "Google Cloud Platform"
+    }, {
+      "children" : [ {
+        "containerInstances" : [ {
+          "containerId" : "6",
+          "environment" : "Sandbox",
+          "id" : "46",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "sandbox.gcp.assetsBucket.frontendInstance"
+          },
+          "relationships" : [ {
+            "description" : "Reads and writes data",
+            "destinationId" : "52",
+            "id" : "53",
+            "linkedRelationshipId" : "17",
+            "sourceId" : "46",
+            "technology" : "HTTPS, JSON"
+          } ],
+          "tags" : "Container Instance"
+        } ],
+        "description" : "Built SPA assets, uploaded additively on deploy.",
+        "environment" : "Sandbox",
+        "id" : "45",
+        "instances" : "1",
+        "name" : "Assets bucket",
+        "properties" : {
+          "structurizr.dsl.identifier" : "sandbox.gcp.assetsBucket"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "Cloud Storage"
+      }, {
+        "containerInstances" : [ {
+          "containerId" : "11",
+          "environment" : "Sandbox",
+          "id" : "50",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "sandbox.gcp.pubsub.messagesInstance"
+          },
+          "relationships" : [ {
+            "description" : "Pushes messages to /internal/pubsub",
+            "destinationId" : "52",
+            "id" : "55",
+            "linkedRelationshipId" : "24",
+            "sourceId" : "50",
+            "technology" : "HTTPS, Google OIDC"
+          } ],
+          "tags" : "Container Instance"
+        } ],
+        "description" : "<app>-messages-sandbox, push subscription with a dead-letter topic.",
+        "environment" : "Sandbox",
+        "id" : "49",
+        "instances" : "1",
+        "name" : "Pub/Sub",
+        "properties" : {
+          "structurizr.dsl.identifier" : "sandbox.gcp.pubsub"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "Google Pub/Sub"
+      }, {
+        "containerInstances" : [ {
+          "containerId" : "7",
+          "environment" : "Sandbox",
+          "id" : "52",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "sandbox.gcp.cloudRun.apiInstance"
+          },
+          "relationships" : [ {
+            "description" : "Publishes internal messages after commit",
+            "destinationId" : "50",
+            "id" : "54",
+            "linkedRelationshipId" : "23",
+            "sourceId" : "52",
+            "technology" : "Google Pub/Sub"
+          }, {
+            "description" : "Reads and writes",
+            "destinationId" : "57",
+            "id" : "58",
+            "linkedRelationshipId" : "22",
+            "sourceId" : "52",
+            "technology" : "SQL"
+          }, {
+            "description" : "Wraps and unwraps Data Protection keys",
+            "destinationId" : "48",
+            "id" : "63",
+            "sourceId" : "52",
+            "tags" : "Relationship",
+            "technology" : "HTTPS"
+          }, {
+            "description" : "Sends traces and metrics",
+            "destinationId" : "41",
+            "id" : "64",
+            "sourceId" : "52",
+            "tags" : "Relationship",
+            "technology" : "OTLP, gRPC"
+          } ],
+          "tags" : "Container Instance"
+        } ],
+        "description" : "<app>-api-sandbox, request-based billing, scales to zero.",
+        "environment" : "Sandbox",
+        "id" : "51",
+        "instances" : "1",
+        "name" : "Cloud Run",
+        "properties" : {
+          "structurizr.dsl.identifier" : "sandbox.gcp.cloudRun"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "Cloud Run service"
+      }, {
+        "containerInstances" : [ {
+          "containerId" : "12",
+          "environment" : "Sandbox",
+          "id" : "57",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "sandbox.gcp.cloudSql.databaseInstance"
+          },
+          "tags" : "Container Instance"
+        } ],
+        "description" : "The platform's shared instance, one database per environment, IAM authentication through the Cloud SQL Auth Proxy.",
+        "environment" : "Sandbox",
+        "id" : "56",
+        "instances" : "1",
+        "name" : "Cloud SQL",
+        "properties" : {
+          "structurizr.dsl.identifier" : "sandbox.gcp.cloudSql"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "Cloud SQL for PostgreSQL"
+      } ],
+      "description" : "Project from the platform landing zone.",
+      "environment" : "Sandbox",
+      "id" : "42",
+      "infrastructureNodes" : [ {
+        "description" : "<app>.sandbox.bcc.no. TLS, DNS and routing.",
+        "environment" : "Sandbox",
+        "id" : "43",
+        "name" : "Platform gateway",
+        "properties" : {
+          "structurizr.dsl.identifier" : "sandbox.gcp.gateway"
+        },
+        "relationships" : [ {
+          "description" : "Routes /assets/*",
+          "destinationId" : "44",
+          "id" : "59",
+          "sourceId" : "43",
+          "tags" : "Relationship",
+          "technology" : "HTTPS"
+        }, {
+          "description" : "Routes everything else: index.html (auth check), /api and /health",
+          "destinationId" : "52",
+          "id" : "61",
+          "sourceId" : "43",
+          "tags" : "Relationship",
+          "technology" : "HTTPS"
+        } ],
+        "tags" : "Element,Infrastructure Node",
+        "technology" : "Cloud Load Balancing"
+      }, {
+        "description" : "Caches the frontend's hashed assets.",
+        "environment" : "Sandbox",
+        "id" : "44",
+        "name" : "CDN",
+        "properties" : {
+          "structurizr.dsl.identifier" : "sandbox.gcp.cdn"
+        },
+        "relationships" : [ {
+          "description" : "Fetches on cache miss",
+          "destinationId" : "46",
+          "id" : "60",
+          "sourceId" : "44",
+          "tags" : "Relationship",
+          "technology" : "HTTPS"
+        } ],
+        "tags" : "Element,Infrastructure Node",
+        "technology" : "Cloud CDN"
+      }, {
+        "description" : "Durability pass every minute.",
+        "environment" : "Sandbox",
+        "id" : "47",
+        "name" : "Cloud Scheduler",
+        "properties" : {
+          "structurizr.dsl.identifier" : "sandbox.gcp.scheduler"
+        },
+        "relationships" : [ {
+          "description" : "Calls /internal/durability/pass",
+          "destinationId" : "52",
+          "id" : "62",
+          "sourceId" : "47",
+          "tags" : "Relationship",
+          "technology" : "HTTPS, Google OIDC"
+        } ],
+        "tags" : "Element,Infrastructure Node",
+        "technology" : "Cloud Scheduler"
+      }, {
+        "description" : "Wraps the Data Protection keys.",
+        "environment" : "Sandbox",
+        "id" : "48",
+        "name" : "Cloud KMS",
+        "properties" : {
+          "structurizr.dsl.identifier" : "sandbox.gcp.kms"
+        },
+        "tags" : "Element,Infrastructure Node",
+        "technology" : "Cloud KMS"
+      } ],
+      "instances" : "1",
+      "name" : "Google Cloud",
+      "properties" : {
+        "structurizr.dsl.identifier" : "sandbox.gcp"
+      },
+      "tags" : "Element,Deployment Node",
+      "technology" : "Google Cloud Platform"
+    }, {
+      "children" : [ {
+        "containerInstances" : [ {
+          "containerId" : "7",
+          "environment" : "Preview",
+          "id" : "67",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "preview.gcp.cloudRun.apiInstance"
+          },
+          "relationships" : [ {
+            "description" : "Publishes internal messages after commit",
+            "destinationId" : "71",
+            "id" : "73",
+            "linkedRelationshipId" : "23",
+            "sourceId" : "67",
+            "technology" : "Google Pub/Sub"
+          }, {
+            "description" : "Reads and writes",
+            "destinationId" : "75",
+            "id" : "76",
+            "linkedRelationshipId" : "22",
+            "sourceId" : "67",
+            "technology" : "SQL"
+          }, {
+            "description" : "Signs users in",
+            "destinationId" : "68",
+            "id" : "77",
+            "sourceId" : "67",
+            "tags" : "Relationship",
+            "technology" : "HTTPS"
+          } ],
+          "tags" : "Container Instance"
+        } ],
+        "description" : "<app>-api-pr<N>, scales to zero, one instance, run.app URL.",
+        "environment" : "Preview",
+        "id" : "66",
+        "instances" : "1",
+        "name" : "Cloud Run",
+        "properties" : {
+          "structurizr.dsl.identifier" : "preview.gcp.cloudRun"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "Cloud Run service"
+      }, {
+        "containerInstances" : [ {
+          "containerId" : "11",
+          "environment" : "Preview",
+          "id" : "71",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "preview.gcp.pubsub.messagesInstance"
+          },
+          "relationships" : [ {
+            "description" : "Pushes messages to /internal/pubsub",
+            "destinationId" : "67",
+            "id" : "72",
+            "linkedRelationshipId" : "24",
+            "sourceId" : "71",
+            "technology" : "HTTPS, Google OIDC"
+          } ],
+          "tags" : "Container Instance"
+        } ],
+        "description" : "One topic per PR, push subscription with a dead-letter topic.",
+        "environment" : "Preview",
+        "id" : "70",
+        "instances" : "1",
+        "name" : "Pub/Sub",
+        "properties" : {
+          "structurizr.dsl.identifier" : "preview.gcp.pubsub"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "Google Pub/Sub"
+      }, {
+        "containerInstances" : [ {
+          "containerId" : "12",
+          "environment" : "Preview",
+          "id" : "75",
+          "instanceId" : 1,
+          "properties" : {
+            "structurizr.dsl.identifier" : "preview.gcp.cloudSql.databaseInstance"
+          },
+          "tags" : "Container Instance"
+        } ],
+        "description" : "The platform's shared instance; one schema pr<N> per preview.",
+        "environment" : "Preview",
+        "id" : "74",
+        "instances" : "1",
+        "name" : "Cloud SQL",
+        "properties" : {
+          "structurizr.dsl.identifier" : "preview.gcp.cloudSql"
+        },
+        "tags" : "Element,Deployment Node",
+        "technology" : "Cloud SQL for PostgreSQL"
+      } ],
+      "description" : "The landing zone's dev environment, used only for PR previews. One set of services per PR, named ...-pr<N>. ADR 0027.",
+      "environment" : "Preview",
+      "id" : "65",
+      "infrastructureNodes" : [ {
+        "description" : "<app>-oidc-pr<N> signs in the personas in place of BCC Signon.",
+        "environment" : "Preview",
+        "id" : "68",
+        "name" : "OIDC mock",
+        "properties" : {
+          "structurizr.dsl.identifier" : "preview.gcp.mocks"
+        },
+        "tags" : "Element,Infrastructure Node",
+        "technology" : "Cloud Run"
+      }, {
+        "description" : "Durability pass every 30 minutes.",
+        "environment" : "Preview",
+        "id" : "69",
+        "name" : "Cloud Scheduler",
+        "properties" : {
+          "structurizr.dsl.identifier" : "preview.gcp.scheduler"
+        },
+        "relationships" : [ {
+          "description" : "Calls /internal/durability/pass",
+          "destinationId" : "67",
+          "id" : "78",
+          "sourceId" : "69",
+          "tags" : "Relationship",
+          "technology" : "HTTPS, Google OIDC"
+        } ],
+        "tags" : "Element,Infrastructure Node",
+        "technology" : "Cloud Scheduler"
+      } ],
+      "instances" : "1",
+      "name" : "Google Cloud (dev project)",
+      "properties" : {
+        "structurizr.dsl.identifier" : "preview.gcp"
+      },
+      "tags" : "Element,Deployment Node",
+      "technology" : "Google Cloud Platform"
+    } ],
+    "people" : [ {
+      "description" : "Keeps personal notes.",
+      "id" : "1",
+      "name" : "Signed-in user",
+      "properties" : {
+        "structurizr.dsl.identifier" : "user"
+      },
+      "relationships" : [ {
+        "description" : "Uses",
+        "destinationId" : "6",
+        "id" : "13",
+        "sourceId" : "1",
+        "tags" : "Relationship",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Uses",
+        "destinationId" : "5",
+        "id" : "14",
+        "linkedRelationshipId" : "13",
+        "sourceId" : "1",
+        "technology" : "HTTPS"
+      } ],
+      "tags" : "Element,Person"
+    }, {
+      "description" : "Reads note statistics. Signs in with MFA.",
+      "id" : "2",
+      "name" : "Administrator",
+      "properties" : {
+        "structurizr.dsl.identifier" : "admin"
+      },
+      "relationships" : [ {
+        "description" : "Uses",
+        "destinationId" : "6",
+        "id" : "15",
+        "sourceId" : "2",
+        "tags" : "Relationship",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Uses",
+        "destinationId" : "5",
+        "id" : "16",
+        "linkedRelationshipId" : "15",
+        "sourceId" : "2",
+        "technology" : "HTTPS"
+      } ],
+      "tags" : "Element,Person"
+    } ],
+    "softwareSystems" : [ {
+      "description" : "login.bcc.no (Auth0). Signs users in and ends their sessions centrally.",
+      "documentation" : { },
+      "group" : "BCC Platform",
+      "id" : "3",
+      "name" : "BCC Signon",
+      "properties" : {
+        "structurizr.dsl.identifier" : "bccSignon"
+      },
+      "relationships" : [ {
+        "description" : "Ends sessions at /auth/backchannel-logout",
+        "destinationId" : "7",
+        "id" : "20",
+        "sourceId" : "3",
+        "tags" : "Relationship",
+        "technology" : "HTTPS, signed logout token"
+      }, {
+        "description" : "Ends sessions at /auth/backchannel-logout",
+        "destinationId" : "5",
+        "id" : "21",
+        "linkedRelationshipId" : "20",
+        "sourceId" : "3",
+        "technology" : "HTTPS, signed logout token"
+      } ],
+      "tags" : "Element,Software System,External"
+    }, {
+      "description" : "Event bus for integration events. The sample sends none.",
+      "documentation" : { },
+      "group" : "BCC Platform",
+      "id" : "4",
+      "name" : "BCC PubSub",
+      "properties" : {
+        "structurizr.dsl.identifier" : "bccPubSub"
+      },
+      "tags" : "Element,Software System,External"
+    }, {
+      "containers" : [ {
+        "description" : "Single-page app. index.html comes from the API; the hashed /assets come from a bucket behind Cloud CDN.",
+        "documentation" : { },
+        "id" : "6",
+        "name" : "Frontend",
+        "properties" : {
+          "structurizr.dsl.identifier" : "app.frontend"
+        },
+        "relationships" : [ {
+          "description" : "Reads and writes data",
+          "destinationId" : "7",
+          "id" : "17",
+          "sourceId" : "6",
+          "tags" : "Relationship",
+          "technology" : "HTTPS, JSON"
+        } ],
+        "tags" : "Element,Container,Web Browser",
+        "technology" : "Vue 3, TypeScript"
+      }, {
+        "components" : [ {
+          "description" : "Create, edit and archive a person's notes. A note the caller cannot see answers 404.",
+          "documentation" : { },
+          "id" : "8",
+          "name" : "Notes",
+          "properties" : {
+            "structurizr.dsl.identifier" : "app.api.notes"
+          },
+          "relationships" : [ {
+            "description" : "Stores notes, their history and changes",
+            "destinationId" : "12",
+            "id" : "27",
+            "sourceId" : "8",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component"
+        }, {
+          "description" : "Who is signed in, and their roles.",
+          "documentation" : { },
+          "id" : "9",
+          "name" : "Current user",
+          "properties" : {
+            "structurizr.dsl.identifier" : "app.api.currentUser"
+          },
+          "tags" : "Element,Component"
+        }, {
+          "description" : "Note counts for administrators.",
+          "documentation" : { },
+          "id" : "10",
+          "name" : "Admin",
+          "properties" : {
+            "structurizr.dsl.identifier" : "app.api.adminStats"
+          },
+          "relationships" : [ {
+            "description" : "Counts notes",
+            "destinationId" : "12",
+            "id" : "28",
+            "sourceId" : "10",
+            "tags" : "Relationship"
+          } ],
+          "tags" : "Element,Component"
+        } ],
+        "description" : "Serves the API under /api and the SPA's index.html. Signs users in as a BFF with server-side sessions.",
+        "documentation" : { },
+        "id" : "7",
+        "name" : "API",
+        "properties" : {
+          "structurizr.dsl.identifier" : "app.api"
+        },
+        "relationships" : [ {
+          "description" : "Signs users in (BFF, session cookie, PKCE and PAR)",
+          "destinationId" : "3",
+          "id" : "18",
+          "sourceId" : "7",
+          "tags" : "Relationship",
+          "technology" : "OIDC"
+        }, {
+          "description" : "Reads and writes",
+          "destinationId" : "12",
+          "id" : "22",
+          "sourceId" : "7",
+          "tags" : "Relationship",
+          "technology" : "SQL"
+        }, {
+          "description" : "Publishes internal messages after commit",
+          "destinationId" : "11",
+          "id" : "23",
+          "sourceId" : "7",
+          "tags" : "Relationship",
+          "technology" : "Google Pub/Sub"
+        }, {
+          "description" : "Publishes integration events (optional)",
+          "destinationId" : "4",
+          "id" : "25",
+          "sourceId" : "7",
+          "tags" : "Relationship",
+          "technology" : "HTTPS, client credentials"
+        } ],
+        "tags" : "Element,Container",
+        "technology" : ".NET 11, Wolverine.HTTP, EF Core"
+      }, {
+        "description" : "Internal messages between the API's own handlers, pushed back to the API. Locally the durable inbox does this.",
+        "documentation" : { },
+        "id" : "11",
+        "name" : "Message topic",
+        "properties" : {
+          "structurizr.dsl.identifier" : "app.messages"
+        },
+        "relationships" : [ {
+          "description" : "Pushes messages to /internal/pubsub",
+          "destinationId" : "7",
+          "id" : "24",
+          "sourceId" : "11",
+          "tags" : "Relationship",
+          "technology" : "HTTPS, Google OIDC"
+        } ],
+        "tags" : "Element,Container,Queue",
+        "technology" : "Google Pub/Sub"
+      }, {
+        "description" : "Notes with typed history, changes, sessions, Data Protection keys, and Wolverine's outbox, inbox and dead letters.",
+        "documentation" : { },
+        "id" : "12",
+        "name" : "Database",
+        "properties" : {
+          "structurizr.dsl.identifier" : "app.database"
+        },
+        "tags" : "Element,Container,Database",
+        "technology" : "PostgreSQL"
+      } ],
+      "description" : "Personal notes with history. The sample an application is made from.",
+      "documentation" : { },
+      "id" : "5",
+      "name" : "Template application",
+      "properties" : {
+        "structurizr.dsl.identifier" : "app"
+      },
+      "relationships" : [ {
+        "description" : "Signs users in (BFF, session cookie, PKCE and PAR)",
+        "destinationId" : "3",
+        "id" : "19",
+        "linkedRelationshipId" : "18",
+        "sourceId" : "5",
+        "technology" : "OIDC"
+      }, {
+        "description" : "Publishes integration events (optional)",
+        "destinationId" : "4",
+        "id" : "26",
+        "linkedRelationshipId" : "25",
+        "sourceId" : "5",
+        "technology" : "HTTPS, client credentials"
+      } ],
+      "tags" : "Element,Software System"
+    } ]
+  },
+  "name" : "Template application",
+  "properties" : {
+    "structurizr.inspection.error" : "10",
+    "structurizr.dsl" : "d29ya3NwYWNlICJUZW1wbGF0ZSBhcHBsaWNhdGlvbiIgIkM0IG1vZGVsIG9mIHRoZSBCQ0MgYXBwbGljYXRpb24gdGVtcGxhdGUgKHRoZSBOb3RlcyBzYW1wbGUpIiB7CgogICAgIWlkZW50aWZpZXJzIGhpZXJhcmNoaWNhbAoKICAgIG1vZGVsIHsKICAgICAgICB1c2VyID0gcGVyc29uICJTaWduZWQtaW4gdXNlciIgIktlZXBzIHBlcnNvbmFsIG5vdGVzLiIKICAgICAgICBhZG1pbiA9IHBlcnNvbiAiQWRtaW5pc3RyYXRvciIgIlJlYWRzIG5vdGUgc3RhdGlzdGljcy4gU2lnbnMgaW4gd2l0aCBNRkEuIgoKICAgICAgICBncm91cCAiQkNDIFBsYXRmb3JtIiB7CiAgICAgICAgICAgIGJjY1NpZ25vbiA9IHNvZnR3YXJlU3lzdGVtICJCQ0MgU2lnbm9uIiAibG9naW4uYmNjLm5vIChBdXRoMCkuIFNpZ25zIHVzZXJzIGluIGFuZCBlbmRzIHRoZWlyIHNlc3Npb25zIGNlbnRyYWxseS4iICJFeHRlcm5hbCIKICAgICAgICAgICAgYmNjUHViU3ViID0gc29mdHdhcmVTeXN0ZW0gIkJDQyBQdWJTdWIiICJFdmVudCBidXMgZm9yIGludGVncmF0aW9uIGV2ZW50cy4gVGhlIHNhbXBsZSBzZW5kcyBub25lLiIgIkV4dGVybmFsIgogICAgICAgIH0KCiAgICAgICAgYXBwID0gc29mdHdhcmVTeXN0ZW0gIlRlbXBsYXRlIGFwcGxpY2F0aW9uIiAiUGVyc29uYWwgbm90ZXMgd2l0aCBoaXN0b3J5LiBUaGUgc2FtcGxlIGFuIGFwcGxpY2F0aW9uIGlzIG1hZGUgZnJvbS4iIHsKICAgICAgICAgICAgZnJvbnRlbmQgPSBjb250YWluZXIgIkZyb250ZW5kIiAiU2luZ2xlLXBhZ2UgYXBwLiBpbmRleC5odG1sIGNvbWVzIGZyb20gdGhlIEFQSTsgdGhlIGhhc2hlZCAvYXNzZXRzIGNvbWUgZnJvbSBhIGJ1Y2tldCBiZWhpbmQgQ2xvdWQgQ0ROLiIgIlZ1ZSAzLCBUeXBlU2NyaXB0IiAiV2ViIEJyb3dzZXIiCiAgICAgICAgICAgIGFwaSA9IGNvbnRhaW5lciAiQVBJIiAiU2VydmVzIHRoZSBBUEkgdW5kZXIgL2FwaSBhbmQgdGhlIFNQQSdzIGluZGV4Lmh0bWwuIFNpZ25zIHVzZXJzIGluIGFzIGEgQkZGIHdpdGggc2VydmVyLXNpZGUgc2Vzc2lvbnMuIiAiLk5FVCAxMSwgV29sdmVyaW5lLkhUVFAsIEVGIENvcmUiIHsKICAgICAgICAgICAgICAgIG5vdGVzID0gY29tcG9uZW50ICJOb3RlcyIgIkNyZWF0ZSwgZWRpdCBhbmQgYXJjaGl2ZSBhIHBlcnNvbidzIG5vdGVzLiBBIG5vdGUgdGhlIGNhbGxlciBjYW5ub3Qgc2VlIGFuc3dlcnMgNDA0LiIKICAgICAgICAgICAgICAgIGN1cnJlbnRVc2VyID0gY29tcG9uZW50ICJDdXJyZW50IHVzZXIiICJXaG8gaXMgc2lnbmVkIGluLCBhbmQgdGhlaXIgcm9sZXMuIgogICAgICAgICAgICAgICAgYWRtaW5TdGF0cyA9IGNvbXBvbmVudCAiQWRtaW4iICJOb3RlIGNvdW50cyBmb3IgYWRtaW5pc3RyYXRvcnMuIgogICAgICAgICAgICB9CiAgICAgICAgICAgIG1lc3NhZ2VzID0gY29udGFpbmVyICJNZXNzYWdlIHRvcGljIiAiSW50ZXJuYWwgbWVzc2FnZXMgYmV0d2VlbiB0aGUgQVBJJ3Mgb3duIGhhbmRsZXJzLCBwdXNoZWQgYmFjayB0byB0aGUgQVBJLiBMb2NhbGx5IHRoZSBkdXJhYmxlIGluYm94IGRvZXMgdGhpcy4iICJHb29nbGUgUHViL1N1YiIgIlF1ZXVlIgogICAgICAgICAgICBkYXRhYmFzZSA9IGNvbnRhaW5lciAiRGF0YWJhc2UiICJOb3RlcyB3aXRoIHR5cGVkIGhpc3RvcnksIGNoYW5nZXMsIHNlc3Npb25zLCBEYXRhIFByb3RlY3Rpb24ga2V5cywgYW5kIFdvbHZlcmluZSdzIG91dGJveCwgaW5ib3ggYW5kIGRlYWQgbGV0dGVycy4iICJQb3N0Z3JlU1FMIiAiRGF0YWJhc2UiCiAgICAgICAgfQoKICAgICAgICB1c2VyIC0+IGFwcC5mcm9udGVuZCAiVXNlcyIgIkhUVFBTIgogICAgICAgIGFkbWluIC0+IGFwcC5mcm9udGVuZCAiVXNlcyIgIkhUVFBTIgoKICAgICAgICBhcHAuZnJvbnRlbmQgLT4gYXBwLmFwaSAiUmVhZHMgYW5kIHdyaXRlcyBkYXRhIiAiSFRUUFMsIEpTT04iCgogICAgICAgIGFwcC5hcGkgLT4gYmNjU2lnbm9uICJTaWducyB1c2VycyBpbiAoQkZGLCBzZXNzaW9uIGNvb2tpZSwgUEtDRSBhbmQgUEFSKSIgIk9JREMiCiAgICAgICAgYmNjU2lnbm9uIC0+IGFwcC5hcGkgIkVuZHMgc2Vzc2lvbnMgYXQgL2F1dGgvYmFja2NoYW5uZWwtbG9nb3V0IiAiSFRUUFMsIHNpZ25lZCBsb2dvdXQgdG9rZW4iCiAgICAgICAgYXBwLmFwaSAtPiBhcHAuZGF0YWJhc2UgIlJlYWRzIGFuZCB3cml0ZXMiICJTUUwiCiAgICAgICAgYXBwLmFwaSAtPiBhcHAubWVzc2FnZXMgIlB1Ymxpc2hlcyBpbnRlcm5hbCBtZXNzYWdlcyBhZnRlciBjb21taXQiICJHb29nbGUgUHViL1N1YiIKICAgICAgICBhcHAubWVzc2FnZXMgLT4gYXBwLmFwaSAiUHVzaGVzIG1lc3NhZ2VzIHRvIC9pbnRlcm5hbC9wdWJzdWIiICJIVFRQUywgR29vZ2xlIE9JREMiCiAgICAgICAgYXBwLmFwaSAtPiBiY2NQdWJTdWIgIlB1Ymxpc2hlcyBpbnRlZ3JhdGlvbiBldmVudHMgKG9wdGlvbmFsKSIgIkhUVFBTLCBjbGllbnQgY3JlZGVudGlhbHMiCgogICAgICAgIGFwcC5hcGkubm90ZXMgLT4gYXBwLmRhdGFiYXNlICJTdG9yZXMgbm90ZXMsIHRoZWlyIGhpc3RvcnkgYW5kIGNoYW5nZXMiCiAgICAgICAgYXBwLmFwaS5hZG1pblN0YXRzIC0+IGFwcC5kYXRhYmFzZSAiQ291bnRzIG5vdGVzIgoKICAgICAgICBsb2NhbCA9IGRlcGxveW1lbnRFbnZpcm9ubWVudCAiTG9jYWwiIHsKICAgICAgICAgICAgZGV2ZWxvcGVyID0gZGVwbG95bWVudE5vZGUgIkRldmVsb3BlciBtYWNoaW5lIiAiIiAiV2luZG93cywgbWFjT1Mgb3IgTGludXgiIHsKICAgICAgICAgICAgICAgIGFzcGlyZSA9IGRlcGxveW1lbnROb2RlICJBc3BpcmUgQXBwSG9zdCIgImFzcGlyZSBydW4iICIuTkVUIEFzcGlyZSIgewogICAgICAgICAgICAgICAgICAgIGFwaVByb2Nlc3MgPSBkZXBsb3ltZW50Tm9kZSAiQVBJIHByb2Nlc3MiICIiICIuTkVUIDExIiB7CiAgICAgICAgICAgICAgICAgICAgICAgIGFwaUluc3RhbmNlID0gY29udGFpbmVySW5zdGFuY2UgYXBwLmFwaQogICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICB2aXRlID0gZGVwbG95bWVudE5vZGUgIlZpdGUgZGV2IHNlcnZlciIgIlByb3hpZWQgYnkgdGhlIEFQSSAoWUFSUCksIG5vdCBicm93c2VkIGRpcmVjdGx5LiIgIk5vZGUuanMsIFZpdGUiIHsKICAgICAgICAgICAgICAgICAgICAgICAgZnJvbnRlbmRJbnN0YW5jZSA9IGNvbnRhaW5lckluc3RhbmNlIGFwcC5mcm9udGVuZAogICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICBwb3N0Z3JlcyA9IGRlcGxveW1lbnROb2RlICJQb3N0Z3JlU1FMIGNvbnRhaW5lciIgIiIgIkRvY2tlciIgewogICAgICAgICAgICAgICAgICAgICAgICBkYXRhYmFzZUluc3RhbmNlID0gY29udGFpbmVySW5zdGFuY2UgYXBwLmRhdGFiYXNlCiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgIG1vY2tzID0gaW5mcmFzdHJ1Y3R1cmVOb2RlICJPSURDIG1vY2siICJhcGkvT2lkY01vY2sgc3RhbmRzIGluIGZvciBCQ0MgU2lnbm9uIHdpdGggdGVzdCBwZXJzb25hcy4gTm8gUHViL1N1YiBsb2NhbGx5OiBpbnRlcm5hbCBtZXNzYWdlcyBydW4gZnJvbSB0aGUgZHVyYWJsZSBpbmJveCwgYW5kIHRoZSBBcHBIb3N0IGNhbGxzIHRoZSBkdXJhYmlsaXR5IHBhc3MgaW4gYSBsb29wLiIgIi5ORVQgMTEiCiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0KICAgICAgICB9CgogICAgICAgIHNhbmRib3ggPSBkZXBsb3ltZW50RW52aXJvbm1lbnQgIlNhbmRib3giIHsKICAgICAgICAgICAgbW9uaXRvcmluZyA9IGRlcGxveW1lbnROb2RlICJCQ0MgbW9uaXRvcmluZyIgIlRoZSBwbGF0Zm9ybSdzIHNoYXJlZCBtb25pdG9yaW5nIHByb2plY3QgKGJjYy1tb25pdG9yaW5nKS4iICJHb29nbGUgQ2xvdWQgUGxhdGZvcm0iIHsKICAgICAgICAgICAgICAgIGNvbGxlY3RvciA9IGluZnJhc3RydWN0dXJlTm9kZSAiT3BlblRlbGVtZXRyeSBjb2xsZWN0b3IiICJXcml0ZXMgdHJhY2VzIHRvIENsb3VkIFRyYWNlICh0aGlzIHByb2plY3QgYW5kIHRoZSBjZW50cmFsIG9uZSkgYW5kIG1ldHJpY3MgdG8gTWFuYWdlZCBQcm9tZXRoZXVzIGZvciBHcmFmYW5hLiBBRFIgMDAyNi4iICJDbG91ZCBSdW4iCiAgICAgICAgICAgIH0KICAgICAgICAgICAgZ2NwID0gZGVwbG95bWVudE5vZGUgIkdvb2dsZSBDbG91ZCIgIlByb2plY3QgZnJvbSB0aGUgcGxhdGZvcm0gbGFuZGluZyB6b25lLiIgIkdvb2dsZSBDbG91ZCBQbGF0Zm9ybSIgewogICAgICAgICAgICAgICAgZ2F0ZXdheSA9IGluZnJhc3RydWN0dXJlTm9kZSAiUGxhdGZvcm0gZ2F0ZXdheSIgIjxhcHA+LnNhbmRib3guYmNjLm5vLiBUTFMsIEROUyBhbmQgcm91dGluZy4iICJDbG91ZCBMb2FkIEJhbGFuY2luZyIKICAgICAgICAgICAgICAgIGNkbiA9IGluZnJhc3RydWN0dXJlTm9kZSAiQ0ROIiAiQ2FjaGVzIHRoZSBmcm9udGVuZCdzIGhhc2hlZCBhc3NldHMuIiAiQ2xvdWQgQ0ROIgoKICAgICAgICAgICAgICAgIGFzc2V0c0J1Y2tldCA9IGRlcGxveW1lbnROb2RlICJBc3NldHMgYnVja2V0IiAiQnVpbHQgU1BBIGFzc2V0cywgdXBsb2FkZWQgYWRkaXRpdmVseSBvbiBkZXBsb3kuIiAiQ2xvdWQgU3RvcmFnZSIgewogICAgICAgICAgICAgICAgICAgIGZyb250ZW5kSW5zdGFuY2UgPSBjb250YWluZXJJbnN0YW5jZSBhcHAuZnJvbnRlbmQKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIHNjaGVkdWxlciA9IGluZnJhc3RydWN0dXJlTm9kZSAiQ2xvdWQgU2NoZWR1bGVyIiAiRHVyYWJpbGl0eSBwYXNzIGV2ZXJ5IG1pbnV0ZS4iICJDbG91ZCBTY2hlZHVsZXIiCiAgICAgICAgICAgICAgICBrbXMgPSBpbmZyYXN0cnVjdHVyZU5vZGUgIkNsb3VkIEtNUyIgIldyYXBzIHRoZSBEYXRhIFByb3RlY3Rpb24ga2V5cy4iICJDbG91ZCBLTVMiCiAgICAgICAgICAgICAgICBwdWJzdWIgPSBkZXBsb3ltZW50Tm9kZSAiUHViL1N1YiIgIjxhcHA+LW1lc3NhZ2VzLXNhbmRib3gsIHB1c2ggc3Vic2NyaXB0aW9uIHdpdGggYSBkZWFkLWxldHRlciB0b3BpYy4iICJHb29nbGUgUHViL1N1YiIgewogICAgICAgICAgICAgICAgICAgIG1lc3NhZ2VzSW5zdGFuY2UgPSBjb250YWluZXJJbnN0YW5jZSBhcHAubWVzc2FnZXMKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIGNsb3VkUnVuID0gZGVwbG95bWVudE5vZGUgIkNsb3VkIFJ1biIgIjxhcHA+LWFwaS1zYW5kYm94LCByZXF1ZXN0LWJhc2VkIGJpbGxpbmcsIHNjYWxlcyB0byB6ZXJvLiIgIkNsb3VkIFJ1biBzZXJ2aWNlIiB7CiAgICAgICAgICAgICAgICAgICAgYXBpSW5zdGFuY2UgPSBjb250YWluZXJJbnN0YW5jZSBhcHAuYXBpCiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICBjbG91ZFNxbCA9IGRlcGxveW1lbnROb2RlICJDbG91ZCBTUUwiICJUaGUgcGxhdGZvcm0ncyBzaGFyZWQgaW5zdGFuY2UsIG9uZSBkYXRhYmFzZSBwZXIgZW52aXJvbm1lbnQsIElBTSBhdXRoZW50aWNhdGlvbiB0aHJvdWdoIHRoZSBDbG91ZCBTUUwgQXV0aCBQcm94eS4iICJDbG91ZCBTUUwgZm9yIFBvc3RncmVTUUwiIHsKICAgICAgICAgICAgICAgICAgICBkYXRhYmFzZUluc3RhbmNlID0gY29udGFpbmVySW5zdGFuY2UgYXBwLmRhdGFiYXNlCiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIH0KCiAgICAgICAgICAgIHNhbmRib3guZ2NwLmdhdGV3YXkgLT4gc2FuZGJveC5nY3AuY2RuICJSb3V0ZXMgL2Fzc2V0cy8qIiAiSFRUUFMiCiAgICAgICAgICAgIHNhbmRib3guZ2NwLmNkbiAtPiBzYW5kYm94LmdjcC5hc3NldHNCdWNrZXQuZnJvbnRlbmRJbnN0YW5jZSAiRmV0Y2hlcyBvbiBjYWNoZSBtaXNzIiAiSFRUUFMiCiAgICAgICAgICAgIHNhbmRib3guZ2NwLmdhdGV3YXkgLT4gc2FuZGJveC5nY3AuY2xvdWRSdW4uYXBpSW5zdGFuY2UgIlJvdXRlcyBldmVyeXRoaW5nIGVsc2U6IGluZGV4Lmh0bWwgKGF1dGggY2hlY2spLCAvYXBpIGFuZCAvaGVhbHRoIiAiSFRUUFMiCiAgICAgICAgICAgIHNhbmRib3guZ2NwLnNjaGVkdWxlciAtPiBzYW5kYm94LmdjcC5jbG91ZFJ1bi5hcGlJbnN0YW5jZSAiQ2FsbHMgL2ludGVybmFsL2R1cmFiaWxpdHkvcGFzcyIgIkhUVFBTLCBHb29nbGUgT0lEQyIKICAgICAgICAgICAgc2FuZGJveC5nY3AuY2xvdWRSdW4uYXBpSW5zdGFuY2UgLT4gc2FuZGJveC5nY3Aua21zICJXcmFwcyBhbmQgdW53cmFwcyBEYXRhIFByb3RlY3Rpb24ga2V5cyIgIkhUVFBTIgogICAgICAgICAgICBzYW5kYm94LmdjcC5jbG91ZFJ1bi5hcGlJbnN0YW5jZSAtPiBzYW5kYm94Lm1vbml0b3JpbmcuY29sbGVjdG9yICJTZW5kcyB0cmFjZXMgYW5kIG1ldHJpY3MiICJPVExQLCBnUlBDIgogICAgICAgIH0KCiAgICAgICAgcHJldmlldyA9IGRlcGxveW1lbnRFbnZpcm9ubWVudCAiUHJldmlldyIgewogICAgICAgICAgICBnY3AgPSBkZXBsb3ltZW50Tm9kZSAiR29vZ2xlIENsb3VkIChkZXYgcHJvamVjdCkiICJUaGUgbGFuZGluZyB6b25lJ3MgZGV2IGVudmlyb25tZW50LCB1c2VkIG9ubHkgZm9yIFBSIHByZXZpZXdzLiBPbmUgc2V0IG9mIHNlcnZpY2VzIHBlciBQUiwgbmFtZWQgLi4uLXByPE4+LiBBRFIgMDAyNy4iICJHb29nbGUgQ2xvdWQgUGxhdGZvcm0iIHsKICAgICAgICAgICAgICAgIGNsb3VkUnVuID0gZGVwbG95bWVudE5vZGUgIkNsb3VkIFJ1biIgIjxhcHA+LWFwaS1wcjxOPiwgc2NhbGVzIHRvIHplcm8sIG9uZSBpbnN0YW5jZSwgcnVuLmFwcCBVUkwuIiAiQ2xvdWQgUnVuIHNlcnZpY2UiIHsKICAgICAgICAgICAgICAgICAgICBhcGlJbnN0YW5jZSA9IGNvbnRhaW5lckluc3RhbmNlIGFwcC5hcGkKICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIG1vY2tzID0gaW5mcmFzdHJ1Y3R1cmVOb2RlICJPSURDIG1vY2siICI8YXBwPi1vaWRjLXByPE4+IHNpZ25zIGluIHRoZSBwZXJzb25hcyBpbiBwbGFjZSBvZiBCQ0MgU2lnbm9uLiIgIkNsb3VkIFJ1biIKICAgICAgICAgICAgICAgIHNjaGVkdWxlciA9IGluZnJhc3RydWN0dXJlTm9kZSAiQ2xvdWQgU2NoZWR1bGVyIiAiRHVyYWJpbGl0eSBwYXNzIGV2ZXJ5IDMwIG1pbnV0ZXMuIiAiQ2xvdWQgU2NoZWR1bGVyIgogICAgICAgICAgICAgICAgcHVic3ViID0gZGVwbG95bWVudE5vZGUgIlB1Yi9TdWIiICJPbmUgdG9waWMgcGVyIFBSLCBwdXNoIHN1YnNjcmlwdGlvbiB3aXRoIGEgZGVhZC1sZXR0ZXIgdG9waWMuIiAiR29vZ2xlIFB1Yi9TdWIiIHsKICAgICAgICAgICAgICAgICAgICBtZXNzYWdlc0luc3RhbmNlID0gY29udGFpbmVySW5zdGFuY2UgYXBwLm1lc3NhZ2VzCiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICBjbG91ZFNxbCA9IGRlcGxveW1lbnROb2RlICJDbG91ZCBTUUwiICJUaGUgcGxhdGZvcm0ncyBzaGFyZWQgaW5zdGFuY2U7IG9uZSBzY2hlbWEgcHI8Tj4gcGVyIHByZXZpZXcuIiAiQ2xvdWQgU1FMIGZvciBQb3N0Z3JlU1FMIiB7CiAgICAgICAgICAgICAgICAgICAgZGF0YWJhc2VJbnN0YW5jZSA9IGNvbnRhaW5lckluc3RhbmNlIGFwcC5kYXRhYmFzZQogICAgICAgICAgICAgICAgfQogICAgICAgICAgICB9CgogICAgICAgICAgICBwcmV2aWV3LmdjcC5jbG91ZFJ1bi5hcGlJbnN0YW5jZSAtPiBwcmV2aWV3LmdjcC5tb2NrcyAiU2lnbnMgdXNlcnMgaW4iICJIVFRQUyIKICAgICAgICAgICAgcHJldmlldy5nY3Auc2NoZWR1bGVyIC0+IHByZXZpZXcuZ2NwLmNsb3VkUnVuLmFwaUluc3RhbmNlICJDYWxscyAvaW50ZXJuYWwvZHVyYWJpbGl0eS9wYXNzIiAiSFRUUFMsIEdvb2dsZSBPSURDIgogICAgICAgIH0KICAgIH0KCiAgICB2aWV3cyB7CiAgICAgICAgc3lzdGVtQ29udGV4dCBhcHAgIlN5c3RlbUNvbnRleHQiICJXaG8gdXNlcyB0aGUgYXBwbGljYXRpb24gYW5kIHdoaWNoIHN5c3RlbXMgaXQgZGVwZW5kcyBvbi4iIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIGF1dG9sYXlvdXQgdGIKICAgICAgICB9CgogICAgICAgIGNvbnRhaW5lciBhcHAgIkNvbnRhaW5lcnMiICJUaGUgY29udGFpbmVycyBpbnNpZGUgdGhlIGFwcGxpY2F0aW9uIGFuZCB3aGF0IHRoZXkgdGFsayB0by4iIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIGF1dG9sYXlvdXQgdGIKICAgICAgICB9CgogICAgICAgIGNvbXBvbmVudCBhcHAuYXBpICJDb21wb25lbnRzIiAiVGhlIGZlYXR1cmUgc2xpY2VzIGluIHRoZSBBUEkuIiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgICAgICBhdXRvbGF5b3V0IHRiCiAgICAgICAgfQoKICAgICAgICBkZXBsb3ltZW50IGFwcCBsb2NhbCAiTG9jYWxEZXBsb3ltZW50IiAiTG9jYWwgZGV2ZWxvcG1lbnQgd2l0aCBBc3BpcmUuIiB7CiAgICAgICAgICAgIGluY2x1ZGUgKgogICAgICAgICAgICBhdXRvbGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBkZXBsb3ltZW50IGFwcCBzYW5kYm94ICJTYW5kYm94RGVwbG95bWVudCIgIlRoZSBzYW5kYm94IGVudmlyb25tZW50IGluIEdDUC4iIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIGV4Y2x1ZGUgInNhbmRib3guZ2NwLmFzc2V0c0J1Y2tldC5mcm9udGVuZEluc3RhbmNlIC0+IHNhbmRib3guZ2NwLmNsb3VkUnVuLmFwaUluc3RhbmNlIgogICAgICAgICAgICBhdXRvbGF5b3V0IGxyCiAgICAgICAgfQoKICAgICAgICBkZXBsb3ltZW50IGFwcCBwcmV2aWV3ICJQcmV2aWV3RGVwbG95bWVudCIgIkEgUFIgcHJldmlldyBpbiB0aGUgZGV2IHByb2plY3Qgb2YgdGhlIGxhbmRpbmcgem9uZS4iIHsKICAgICAgICAgICAgaW5jbHVkZSAqCiAgICAgICAgICAgIGF1dG9sYXlvdXQgbHIKICAgICAgICB9CgogICAgICAgIHByb3BlcnRpZXMgewogICAgICAgICAgICAjIE5vIGdlbmVyYXRpb24gZGF0ZSBpbiB0aGUgZm9vdGVyLCBzbyBhbiBleHBvcnQgb25seSBjaGFuZ2VzIHdoZW4gdGhlIG1vZGVsIGRvZXMuCiAgICAgICAgICAgICJzdHJ1Y3R1cml6ci5tZXRhZGF0YSIgImZhbHNlIgogICAgICAgIH0KCiAgICAgICAgc3R5bGVzIHsKICAgICAgICAgICAgZWxlbWVudCAiRWxlbWVudCIgewogICAgICAgICAgICAgICAgY29sb3IgIzM2OTAzMAogICAgICAgICAgICAgICAgc3Ryb2tlICMzNjkwMzAKICAgICAgICAgICAgICAgIHN0cm9rZVdpZHRoIDcKICAgICAgICAgICAgICAgIHNoYXBlIHJvdW5kZWRib3gKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJQZXJzb24iIHsKICAgICAgICAgICAgICAgIHNoYXBlIHBlcnNvbgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIkNvbnRhaW5lciIgewogICAgICAgICAgICAgICAgc3Ryb2tlICM2MGFhNWEKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJDb21wb25lbnQiIHsKICAgICAgICAgICAgICAgIHN0cm9rZSAjYTNkOWE1CiAgICAgICAgICAgICAgICBzaGFwZSBjb21wb25lbnQKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJEYXRhYmFzZSIgewogICAgICAgICAgICAgICAgc2hhcGUgY3lsaW5kZXIKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJRdWV1ZSIgewogICAgICAgICAgICAgICAgc2hhcGUgcGlwZQogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIkV4dGVybmFsIiB7CiAgICAgICAgICAgICAgICBjb2xvciAjNTA1MDUwCiAgICAgICAgICAgICAgICBzdHJva2UgIzUwNTA1MAogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIldlYiBCcm93c2VyIiB7CiAgICAgICAgICAgICAgICBzaGFwZSB3ZWJicm93c2VyCiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICB9Cn0=",
+    "structurizr.inspection.info" : "0",
+    "structurizr.inspection.ignore" : "0",
+    "structurizr.inspection.warning" : "0"
+  },
+  "views" : {
+    "componentViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "TopBottom",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "containerId" : "7",
+      "description" : "The feature slices in the API.",
+      "elements" : [ {
+        "id" : "8",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "9",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "10",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "12",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalContainerBoundariesVisible" : false,
+      "key" : "Components",
+      "name" : "Component View: Template application - API",
+      "order" : 3,
+      "relationships" : [ {
+        "id" : "27"
+      }, {
+        "id" : "28"
+      } ]
+    } ],
+    "configuration" : {
+      "properties" : {
+        "structurizr.metadata" : "false"
+      },
+      "styles" : {
+        "elements" : [ {
+          "shape" : "Component",
+          "stroke" : "#a3d9a5",
+          "tag" : "Component"
+        }, {
+          "stroke" : "#60aa5a",
+          "tag" : "Container"
+        }, {
+          "shape" : "Cylinder",
+          "tag" : "Database"
+        }, {
+          "color" : "#369030",
+          "shape" : "RoundedBox",
+          "stroke" : "#369030",
+          "strokeWidth" : 7,
+          "tag" : "Element"
+        }, {
+          "color" : "#505050",
+          "stroke" : "#505050",
+          "tag" : "External"
+        }, {
+          "shape" : "Person",
+          "tag" : "Person"
+        }, {
+          "shape" : "Pipe",
+          "tag" : "Queue"
+        }, {
+          "shape" : "WebBrowser",
+          "tag" : "Web Browser"
+        } ]
+      },
+      "terminology" : { }
+    },
+    "containerViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "TopBottom",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "The containers inside the application and what they talk to.",
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "2",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "3",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "6",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "7",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "11",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "12",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "externalSoftwareSystemBoundariesVisible" : false,
+      "key" : "Containers",
+      "name" : "Container View: Template application",
+      "order" : 2,
+      "relationships" : [ {
+        "id" : "13"
+      }, {
+        "id" : "15"
+      }, {
+        "id" : "17"
+      }, {
+        "id" : "18"
+      }, {
+        "id" : "20"
+      }, {
+        "id" : "22"
+      }, {
+        "id" : "23"
+      }, {
+        "id" : "24"
+      }, {
+        "id" : "25"
+      } ],
+      "softwareSystemId" : "5"
+    } ],
+    "deploymentViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "Local development with Aspire.",
+      "elements" : [ {
+        "id" : "29",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "30",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "31",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "32",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "33",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "34",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "36",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "37",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "39",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "environment" : "Local",
+      "key" : "LocalDeployment",
+      "name" : "Deployment View: Template application - Local",
+      "order" : 4,
+      "relationships" : [ {
+        "id" : "35"
+      }, {
+        "id" : "38"
+      } ],
+      "softwareSystemId" : "5"
+    }, {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "The sandbox environment in GCP.",
+      "elements" : [ {
+        "id" : "40",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "41",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "42",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "43",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "44",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "45",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "46",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "47",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "48",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "49",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "50",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "51",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "52",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "56",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "57",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "environment" : "Sandbox",
+      "key" : "SandboxDeployment",
+      "name" : "Deployment View: Template application - Sandbox",
+      "order" : 5,
+      "relationships" : [ {
+        "id" : "54"
+      }, {
+        "id" : "55"
+      }, {
+        "id" : "58"
+      }, {
+        "id" : "59"
+      }, {
+        "id" : "60"
+      }, {
+        "id" : "61"
+      }, {
+        "id" : "62"
+      }, {
+        "id" : "63"
+      }, {
+        "id" : "64"
+      } ],
+      "softwareSystemId" : "5"
+    }, {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "LeftRight",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "A PR preview in the dev project of the landing zone.",
+      "elements" : [ {
+        "id" : "65",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "66",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "67",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "68",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "69",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "70",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "71",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "74",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "75",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "environment" : "Preview",
+      "key" : "PreviewDeployment",
+      "name" : "Deployment View: Template application - Preview",
+      "order" : 6,
+      "relationships" : [ {
+        "id" : "72"
+      }, {
+        "id" : "73"
+      }, {
+        "id" : "76"
+      }, {
+        "id" : "77"
+      }, {
+        "id" : "78"
+      } ],
+      "softwareSystemId" : "5"
+    } ],
+    "systemContextViews" : [ {
+      "automaticLayout" : {
+        "edgeSeparation" : 50,
+        "nodeSeparation" : 50,
+        "rankDirection" : "TopBottom",
+        "rankSeparation" : 100,
+        "vertices" : true
+      },
+      "description" : "Who uses the application and which systems it depends on.",
+      "elements" : [ {
+        "id" : "1",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "2",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "3",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "4",
+        "x" : 0,
+        "y" : 0
+      }, {
+        "id" : "5",
+        "x" : 0,
+        "y" : 0
+      } ],
+      "enterpriseBoundaryVisible" : true,
+      "key" : "SystemContext",
+      "name" : "System Context View: Template application",
+      "order" : 1,
+      "relationships" : [ {
+        "id" : "14"
+      }, {
+        "id" : "16"
+      }, {
+        "id" : "19"
+      }, {
+        "id" : "21"
+      }, {
+        "id" : "26"
+      } ],
+      "softwareSystemId" : "5"
+    } ]
+  }
+}

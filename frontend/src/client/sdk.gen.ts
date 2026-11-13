@@ -3,27 +3,30 @@
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client'
 import { client } from './client.gen'
 import type {
-  ArchiveNoteData,
-  ArchiveNoteErrors,
-  ArchiveNoteResponses,
-  CreateNoteData,
-  CreateNoteErrors,
-  CreateNoteResponses,
-  EditNoteData,
-  EditNoteErrors,
-  EditNoteResponses,
-  GetMeData,
-  GetMeErrors,
-  GetMeResponses,
-  GetNoteData,
-  GetNoteErrors,
-  GetNoteResponses,
-  GetStatsData,
-  GetStatsErrors,
-  GetStatsResponses,
-  ListNotesData,
-  ListNotesErrors,
-  ListNotesResponses,
+  GetApiAdminStatsData,
+  GetApiAdminStatsErrors,
+  GetApiAdminStatsResponses,
+  GetApiMeData,
+  GetApiMeErrors,
+  GetApiMeResponses,
+  GetApiNotesByNoteIdData,
+  GetApiNotesByNoteIdErrors,
+  GetApiNotesByNoteIdHistoryData,
+  GetApiNotesByNoteIdHistoryErrors,
+  GetApiNotesByNoteIdHistoryResponses,
+  GetApiNotesByNoteIdResponses,
+  GetApiNotesData,
+  GetApiNotesErrors,
+  GetApiNotesResponses,
+  PostApiNotesByNoteIdArchiveData,
+  PostApiNotesByNoteIdArchiveErrors,
+  PostApiNotesByNoteIdArchiveResponses,
+  PostApiNotesByNoteIdEditData,
+  PostApiNotesByNoteIdEditErrors,
+  PostApiNotesByNoteIdEditResponses,
+  PostApiNotesData,
+  PostApiNotesErrors,
+  PostApiNotesResponses,
 } from './types.gen'
 
 export type Options<
@@ -44,93 +47,131 @@ export type Options<
   meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta
 }
 
-/**
- * GET_api_admin_stats
- *
- * getStats
- */
-export const getStats = <ThrowOnError extends boolean = true>(
-  options?: Options<GetStatsData, ThrowOnError>,
-): RequestResult<GetStatsResponses, GetStatsErrors, ThrowOnError> =>
-  (options?.client ?? client).get<GetStatsResponses, GetStatsErrors, ThrowOnError>({ url: '/api/admin/stats', ...options })
+export class AdminClient {
+  /**
+   * GET_api_admin_stats
+   *
+   * getStats
+   */
+  public static getStats<ThrowOnError extends boolean = true>(
+    options?: Options<GetApiAdminStatsData, ThrowOnError>,
+  ): RequestResult<GetApiAdminStatsResponses, GetApiAdminStatsErrors, ThrowOnError> {
+    return (options?.client ?? client).get<GetApiAdminStatsResponses, GetApiAdminStatsErrors, ThrowOnError>({
+      url: '/api/admin/stats',
+      ...options,
+    })
+  }
+}
 
-/**
- * GET_api_me
- *
- * getMe
- */
-export const getMe = <ThrowOnError extends boolean = true>(
-  options?: Options<GetMeData, ThrowOnError>,
-): RequestResult<GetMeResponses, GetMeErrors, ThrowOnError> =>
-  (options?.client ?? client).get<GetMeResponses, GetMeErrors, ThrowOnError>({ url: '/api/me', ...options })
+export class UsersClient {
+  /**
+   * GET_api_me
+   *
+   * getMe
+   */
+  public static getMe<ThrowOnError extends boolean = true>(
+    options?: Options<GetApiMeData, ThrowOnError>,
+  ): RequestResult<GetApiMeResponses, GetApiMeErrors, ThrowOnError> {
+    return (options?.client ?? client).get<GetApiMeResponses, GetApiMeErrors, ThrowOnError>({ url: '/api/me', ...options })
+  }
+}
 
-/**
- * GET_api_notes
- *
- * listNotes
- */
-export const listNotes = <ThrowOnError extends boolean = true>(
-  options?: Options<ListNotesData, ThrowOnError>,
-): RequestResult<ListNotesResponses, ListNotesErrors, ThrowOnError> =>
-  (options?.client ?? client).get<ListNotesResponses, ListNotesErrors, ThrowOnError>({ url: '/api/notes', ...options })
+export class NotesClient {
+  /**
+   * GET_api_notes
+   *
+   * listNotes
+   */
+  public static listNotes<ThrowOnError extends boolean = true>(
+    options?: Options<GetApiNotesData, ThrowOnError>,
+  ): RequestResult<GetApiNotesResponses, GetApiNotesErrors, ThrowOnError> {
+    return (options?.client ?? client).get<GetApiNotesResponses, GetApiNotesErrors, ThrowOnError>({
+      url: '/api/notes',
+      ...options,
+    })
+  }
 
-/**
- * POST_api_notes
- *
- * createNote
- */
-export const createNote = <ThrowOnError extends boolean = true>(
-  options: Options<CreateNoteData, ThrowOnError>,
-): RequestResult<CreateNoteResponses, CreateNoteErrors, ThrowOnError> =>
-  (options.client ?? client).post<CreateNoteResponses, CreateNoteErrors, ThrowOnError>({
-    url: '/api/notes',
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  })
+  /**
+   * POST_api_notes
+   *
+   * createNote
+   */
+  public static createNote<ThrowOnError extends boolean = true>(
+    options: Options<PostApiNotesData, ThrowOnError>,
+  ): RequestResult<PostApiNotesResponses, PostApiNotesErrors, ThrowOnError> {
+    return (options.client ?? client).post<PostApiNotesResponses, PostApiNotesErrors, ThrowOnError>({
+      url: '/api/notes',
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    })
+  }
 
-/**
- * GET_api_notes_noteId
- *
- * getNote
- */
-export const getNote = <ThrowOnError extends boolean = true>(
-  options: Options<GetNoteData, ThrowOnError>,
-): RequestResult<GetNoteResponses, GetNoteErrors, ThrowOnError> =>
-  (options.client ?? client).get<GetNoteResponses, GetNoteErrors, ThrowOnError>({ url: '/api/notes/{noteId}', ...options })
+  /**
+   * GET_api_notes_noteId
+   *
+   * getNote
+   */
+  public static getNote<ThrowOnError extends boolean = true>(
+    options: Options<GetApiNotesByNoteIdData, ThrowOnError>,
+  ): RequestResult<GetApiNotesByNoteIdResponses, GetApiNotesByNoteIdErrors, ThrowOnError> {
+    return (options.client ?? client).get<GetApiNotesByNoteIdResponses, GetApiNotesByNoteIdErrors, ThrowOnError>({
+      url: '/api/notes/{noteId}',
+      ...options,
+    })
+  }
 
-/**
- * POST_api_notes_noteId_archive
- *
- * archiveNote
- */
-export const archiveNote = <ThrowOnError extends boolean = true>(
-  options: Options<ArchiveNoteData, ThrowOnError>,
-): RequestResult<ArchiveNoteResponses, ArchiveNoteErrors, ThrowOnError> =>
-  (options.client ?? client).post<ArchiveNoteResponses, ArchiveNoteErrors, ThrowOnError>({
-    url: '/api/notes/{noteId}/archive',
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  })
+  /**
+   * POST_api_notes_noteId_archive
+   *
+   * archiveNote
+   */
+  public static archiveNote<ThrowOnError extends boolean = true>(
+    options: Options<PostApiNotesByNoteIdArchiveData, ThrowOnError>,
+  ): RequestResult<PostApiNotesByNoteIdArchiveResponses, PostApiNotesByNoteIdArchiveErrors, ThrowOnError> {
+    return (options.client ?? client).post<PostApiNotesByNoteIdArchiveResponses, PostApiNotesByNoteIdArchiveErrors, ThrowOnError>(
+      {
+        url: '/api/notes/{noteId}/archive',
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+      },
+    )
+  }
 
-/**
- * POST_api_notes_noteId_edit
- *
- * editNote
- */
-export const editNote = <ThrowOnError extends boolean = true>(
-  options: Options<EditNoteData, ThrowOnError>,
-): RequestResult<EditNoteResponses, EditNoteErrors, ThrowOnError> =>
-  (options.client ?? client).post<EditNoteResponses, EditNoteErrors, ThrowOnError>({
-    url: '/api/notes/{noteId}/edit',
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  })
+  /**
+   * POST_api_notes_noteId_edit
+   *
+   * editNote
+   */
+  public static editNote<ThrowOnError extends boolean = true>(
+    options: Options<PostApiNotesByNoteIdEditData, ThrowOnError>,
+  ): RequestResult<PostApiNotesByNoteIdEditResponses, PostApiNotesByNoteIdEditErrors, ThrowOnError> {
+    return (options.client ?? client).post<PostApiNotesByNoteIdEditResponses, PostApiNotesByNoteIdEditErrors, ThrowOnError>({
+      url: '/api/notes/{noteId}/edit',
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    })
+  }
+
+  /**
+   * GET_api_notes_noteId_history
+   *
+   * getNoteHistory
+   */
+  public static getNoteHistory<ThrowOnError extends boolean = true>(
+    options: Options<GetApiNotesByNoteIdHistoryData, ThrowOnError>,
+  ): RequestResult<GetApiNotesByNoteIdHistoryResponses, GetApiNotesByNoteIdHistoryErrors, ThrowOnError> {
+    return (options.client ?? client).get<GetApiNotesByNoteIdHistoryResponses, GetApiNotesByNoteIdHistoryErrors, ThrowOnError>({
+      url: '/api/notes/{noteId}/history',
+      ...options,
+    })
+  }
+}

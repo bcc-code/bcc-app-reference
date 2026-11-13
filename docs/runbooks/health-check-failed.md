@@ -1,15 +1,15 @@
 # Health check failing
 
-Alert: `template <env>: /health check failing`. The uptime check on `https://<public host>/health` failed from more than one
+Alert: `bcc-template <env>: /health check failing`. The uptime check on `https://<public host>/health` failed from more than one
 location for 5 minutes. `/health` runs all checks, including the database. `/alive` is a self check only and is what Cloud Run
 uses for liveness, so a database outage fails `/health` without restarting instances.
 
 1. Open the URL yourself. Outcomes:
    - Does not resolve, TLS error, or a gateway error page (404 or 502 from the gateway, not from the app): the problem is the
      gateway route or the Cloud Run ingress, not the app. Check that the route for `<app>` exists in the gateway repository and
-     that the backend `bs-template-api-<env>` exists. Cloud Run ingress must be `internal-and-cloud-load-balancing`.
+     that the backend `bs-template-api-<env>` exists ([first-deploy.md](first-deploy.md), step 5). Cloud Run ingress must be `internal-and-cloud-load-balancing`.
    - 503 or a body that names a failing check: read the body. It lists which check failed.
-2. Database check failing: look at the Cloud SQL instance status and the Auth Proxy sidecar logs of the API revision (container
+2. Database check failing: look at the shared Cloud SQL instance's status (ask the platform team) and the Auth Proxy sidecar logs of the API revision (container
    `cloud-sql-proxy`). Typical causes are an instance restart or maintenance, a revoked `roles/cloudsql.instanceUser`, or a
    changed IAM database user.
 3. Service not running: check that revisions are ready. A failed deploy leaves the previous revision serving; a failed startup

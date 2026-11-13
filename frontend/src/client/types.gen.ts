@@ -4,38 +4,113 @@ export type ClientOptions = {
   baseUrl: `${string}://${string}` | (string & {})
 }
 
-export type ArchiveNote = {
+export type ArchiveNoteRequest = {
+  /**
+   * The version the client last read; a different stored version answers 409.
+   */
   version: number
+  /**
+   * Why the note is archived, if the person says; stored as the reason of the change.
+   */
+  comment?: null | string
 }
 
-export type CreateNote = {
+export type CreateNoteRequest = {
+  /**
+   * 1 to 200 characters, trimmed.
+   */
   title: string
+  /**
+   * At most 10 000 characters, may be empty.
+   */
   body: string
 }
 
-export type EditNote = {
+export type CreateNoteResponse = {
+  id: string
   title: string
   body: string
+  createdAt: string
+  updatedAt: string
   version: number
 }
 
-export type HttpValidationProblemDetails = {
-  type?: null | string
-  title?: null | string
-  status?: null | number
-  detail?: null | string
-  instance?: null | string
-  errors?: {
-    [key: string]: Array<string>
-  }
+export type EditNoteRequest = {
+  /**
+   * The new title: 1 to 200 characters, trimmed.
+   */
+  title: string
+  /**
+   * The new body: at most 10 000 characters, may be empty.
+   */
+  body: string
+  /**
+   * The version the client last read. A different stored version means someone else edited since, and the answer is 409.
+   */
+  version: number
 }
 
-export type MeResponse = {
+export type EditNoteResponse = {
+  id: string
+  title: string
+  body: string
+  createdAt: string
+  updatedAt: string
+  version: number
+}
+
+export type GetMeResponse = {
   displayName: string
   roles: Array<string>
 }
 
-export type NoteResponse = {
+export type GetNoteHistoryResponse = {
+  id: string
+  entries: Array<NoteHistoryItem>
+}
+
+export type GetNoteResponse = {
+  id: string
+  title: string
+  body: string
+  createdAt: string
+  updatedAt: string
+  version: number
+}
+
+export type GetStatsResponse = {
+  activeNotes: number
+  archivedNotes: number
+}
+
+export type ListNotesResponse = {
+  notes: Array<NoteItem>
+}
+
+export type NoteHistoryItem = {
+  /**
+   * When the step was taken.
+   */
+  at: string
+  /**
+   * The business step: `NoteCreated`, `NoteEdited` or `NoteArchived`.
+   */
+  step: string
+  /**
+   * The version of the note the step wrote.
+   */
+  version: number
+  /**
+   * The note's title after the step, read from the version the step wrote.
+   */
+  title: string
+  /**
+   * The reason the person gave for the step, if any.
+   */
+  comment: null | string
+}
+
+export type NoteItem = {
   id: string
   title: string
   body: string
@@ -52,106 +127,105 @@ export type ProblemDetails = {
   instance?: null | string
 }
 
-export type StatsResponse = {
-  activeNotes: number
-  archivedNotes: number
-}
-
-export type GetStatsData = {
+export type GetApiAdminStatsData = {
   body?: never
   path?: never
   query?: never
   url: '/api/admin/stats'
 }
 
-export type GetStatsErrors = {
+export type GetApiAdminStatsErrors = {
   /**
    * Not Found
    */
   404: unknown
 }
 
-export type GetStatsResponses = {
+export type GetApiAdminStatsResponses = {
   /**
    * OK
    */
-  200: StatsResponse
+  200: GetStatsResponse
 }
 
-export type GetStatsResponse = GetStatsResponses[keyof GetStatsResponses]
+export type GetApiAdminStatsResponse = GetApiAdminStatsResponses[keyof GetApiAdminStatsResponses]
 
-export type GetMeData = {
+export type GetApiMeData = {
   body?: never
   path?: never
   query?: never
   url: '/api/me'
 }
 
-export type GetMeErrors = {
+export type GetApiMeErrors = {
   /**
    * Not Found
    */
   404: unknown
 }
 
-export type GetMeResponses = {
+export type GetApiMeResponses = {
   /**
    * OK
    */
-  200: MeResponse
+  200: GetMeResponse
 }
 
-export type GetMeResponse = GetMeResponses[keyof GetMeResponses]
+export type GetApiMeResponse = GetApiMeResponses[keyof GetApiMeResponses]
 
-export type ListNotesData = {
+export type GetApiNotesData = {
   body?: never
   path?: never
   query?: never
   url: '/api/notes'
 }
 
-export type ListNotesErrors = {
+export type GetApiNotesErrors = {
   /**
    * Not Found
    */
   404: unknown
 }
 
-export type ListNotesResponses = {
+export type GetApiNotesResponses = {
   /**
    * OK
    */
-  200: Array<NoteResponse>
+  200: ListNotesResponse
 }
 
-export type ListNotesResponse = ListNotesResponses[keyof ListNotesResponses]
+export type GetApiNotesResponse = GetApiNotesResponses[keyof GetApiNotesResponses]
 
-export type CreateNoteData = {
-  body: CreateNote
+export type PostApiNotesData = {
+  body: CreateNoteRequest
   path?: never
   query?: never
   url: '/api/notes'
 }
 
-export type CreateNoteErrors = {
+export type PostApiNotesErrors = {
   /**
    * Bad Request
    */
-  400: HttpValidationProblemDetails
+  400: ProblemDetails
+  /**
+   * Conflict
+   */
+  409: ProblemDetails
 }
 
-export type CreateNoteError = CreateNoteErrors[keyof CreateNoteErrors]
+export type PostApiNotesError = PostApiNotesErrors[keyof PostApiNotesErrors]
 
-export type CreateNoteResponses = {
+export type PostApiNotesResponses = {
   /**
    * Created
    */
-  201: NoteResponse
+  201: CreateNoteResponse
 }
 
-export type CreateNoteResponse = CreateNoteResponses[keyof CreateNoteResponses]
+export type PostApiNotesResponse = PostApiNotesResponses[keyof PostApiNotesResponses]
 
-export type GetNoteData = {
+export type GetApiNotesByNoteIdData = {
   body?: never
   path: {
     noteId: string
@@ -160,30 +234,28 @@ export type GetNoteData = {
   url: '/api/notes/{noteId}'
 }
 
-export type GetNoteErrors = {
+export type GetApiNotesByNoteIdErrors = {
   /**
-   * Bad Request
+   * Forbidden
    */
-  400: ProblemDetails
+  403: unknown
   /**
    * Not Found
    */
-  404: ProblemDetails
+  404: unknown
 }
 
-export type GetNoteError = GetNoteErrors[keyof GetNoteErrors]
-
-export type GetNoteResponses = {
+export type GetApiNotesByNoteIdResponses = {
   /**
    * OK
    */
-  200: NoteResponse
+  200: GetNoteResponse
 }
 
-export type GetNoteResponse = GetNoteResponses[keyof GetNoteResponses]
+export type GetApiNotesByNoteIdResponse = GetApiNotesByNoteIdResponses[keyof GetApiNotesByNoteIdResponses]
 
-export type ArchiveNoteData = {
-  body: ArchiveNote
+export type PostApiNotesByNoteIdArchiveData = {
+  body: ArchiveNoteRequest
   path: {
     noteId: string
   }
@@ -191,34 +263,34 @@ export type ArchiveNoteData = {
   url: '/api/notes/{noteId}/archive'
 }
 
-export type ArchiveNoteErrors = {
+export type PostApiNotesByNoteIdArchiveErrors = {
   /**
-   * Bad Request
+   * Forbidden
    */
-  400: ProblemDetails
+  403: unknown
   /**
    * Not Found
    */
-  404: ProblemDetails
+  404: unknown
   /**
    * Conflict
    */
   409: ProblemDetails
 }
 
-export type ArchiveNoteError = ArchiveNoteErrors[keyof ArchiveNoteErrors]
+export type PostApiNotesByNoteIdArchiveError = PostApiNotesByNoteIdArchiveErrors[keyof PostApiNotesByNoteIdArchiveErrors]
 
-export type ArchiveNoteResponses = {
+export type PostApiNotesByNoteIdArchiveResponses = {
   /**
    * No Content
    */
   204: void
 }
 
-export type ArchiveNoteResponse = ArchiveNoteResponses[keyof ArchiveNoteResponses]
+export type PostApiNotesByNoteIdArchiveResponse = PostApiNotesByNoteIdArchiveResponses[keyof PostApiNotesByNoteIdArchiveResponses]
 
-export type EditNoteData = {
-  body: EditNote
+export type PostApiNotesByNoteIdEditData = {
+  body: EditNoteRequest
   path: {
     noteId: string
   }
@@ -226,28 +298,61 @@ export type EditNoteData = {
   url: '/api/notes/{noteId}/edit'
 }
 
-export type EditNoteErrors = {
+export type PostApiNotesByNoteIdEditErrors = {
   /**
    * Bad Request
    */
-  400: HttpValidationProblemDetails
+  400: ProblemDetails
+  /**
+   * Forbidden
+   */
+  403: unknown
   /**
    * Not Found
    */
-  404: ProblemDetails
+  404: unknown
   /**
    * Conflict
    */
   409: ProblemDetails
 }
 
-export type EditNoteError = EditNoteErrors[keyof EditNoteErrors]
+export type PostApiNotesByNoteIdEditError = PostApiNotesByNoteIdEditErrors[keyof PostApiNotesByNoteIdEditErrors]
 
-export type EditNoteResponses = {
+export type PostApiNotesByNoteIdEditResponses = {
   /**
    * OK
    */
-  200: NoteResponse
+  200: EditNoteResponse
 }
 
-export type EditNoteResponse = EditNoteResponses[keyof EditNoteResponses]
+export type PostApiNotesByNoteIdEditResponse = PostApiNotesByNoteIdEditResponses[keyof PostApiNotesByNoteIdEditResponses]
+
+export type GetApiNotesByNoteIdHistoryData = {
+  body?: never
+  path: {
+    noteId: string
+  }
+  query?: never
+  url: '/api/notes/{noteId}/history'
+}
+
+export type GetApiNotesByNoteIdHistoryErrors = {
+  /**
+   * Forbidden
+   */
+  403: unknown
+  /**
+   * Not Found
+   */
+  404: unknown
+}
+
+export type GetApiNotesByNoteIdHistoryResponses = {
+  /**
+   * OK
+   */
+  200: GetNoteHistoryResponse
+}
+
+export type GetApiNotesByNoteIdHistoryResponse = GetApiNotesByNoteIdHistoryResponses[keyof GetApiNotesByNoteIdHistoryResponses]

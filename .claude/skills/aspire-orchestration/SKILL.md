@@ -11,7 +11,7 @@ description: >-
   INVOKES: VS Code lifecycle tools first when exposed; Aspire CLI for readiness,
   inspection, resource operations, isolated worktree starts, and allowed fallbacks.
   DO NOT USE FOR: deploy/publish/destroy (aspire-deployment), logs/traces/metrics
-  (aspire-monitoring), or AppHost code and resource wiring (see aspire/references/csharp-apphosts.md).
+  (aspire-monitoring), or AppHost code and resource wiring (aspireify).
   FOR SINGLE OPERATIONS: Load the matching editor tool first, then obey the
   exact-target, worktree-isolation, and stop-result rules below.
 license: MIT
@@ -160,7 +160,7 @@ See [safety-guardrails.md](references/safety-guardrails.md) for detailed rules a
 | Discover resource commands | `aspire resource <resource-name> --help` |
 | Attach to an experimental resource terminal | Enable `features.terminalCommandsEnabled`, then use `aspire terminal ps` / `aspire terminal attach` |
 | Create new project | `aspire new aspire-starter` |
-| Add Aspire to existing | Not needed in this repo: the AppHost is `api/AppHost/` |
+| Add Aspire to existing | `aspire init` (then hand off to `aspireify` skill for wiring) |
 | Add integration | `aspire add <package>` |
 | Discover integrations | `aspire integration list --format Json` / `aspire integration search <query> --format Json` |
 | Upgrade the CLI itself | `aspire update --self` (managed installs may print the npm/.NET/Nix update command) |
@@ -227,14 +227,14 @@ The same rule applies to any "file in use", "cannot access the file", or
 
 | Scenario | Route To |
 |----------|----------|
-| AppHost wiring (add resources, ServiceDefaults/OTel) | → [csharp-apphosts](../aspire/references/csharp-apphosts.md) |
-| Browser logs (`Aspire.Hosting.Browsers` / `WithBrowserLogs()`) and dashboard authoring | → [csharp-apphosts](../aspire/references/csharp-apphosts.md) (code edits) and `aspire-monitoring` (discovery) |
-| Custom resource commands, arguments, interactions, or terminals (`WithCommand`, `CommandOptions.Arguments`, `IInteractionService`, `WithTerminal`) | → [csharp-apphosts](../aspire/references/csharp-apphosts.md) |
-| Lifecycle hooks (`SubscribeBeforeStart`, `SubscribeAfterResourcesCreated`, BeforeStart pipeline phase) | → [csharp-apphosts](../aspire/references/csharp-apphosts.md) |
-| Endpoint authoring (`WithEndpoint` updates, `ExcludeReferenceEndpoint` flag) | → [csharp-apphosts](../aspire/references/csharp-apphosts.md) |
+| AppHost wiring after `aspire init` (scan repo, add resources, ServiceDefaults/OTel) | → `aspireify` skill ([`aspireify/SKILL.md`](https://github.com/microsoft/aspire-skills/blob/main/skills/aspireify/SKILL.md)) or project-local `.agents/skills/aspireify/SKILL.md` |
+| Browser logs (`Aspire.Hosting.Browsers` / `WithBrowserLogs()`) and dashboard authoring | → `aspireify` skill (code edits) and `aspire-monitoring` (discovery) |
+| Custom resource commands, arguments, interactions, or terminals (`WithCommand`, `CommandOptions.Arguments`, `IInteractionService`, `WithTerminal`) | → `aspireify` skill |
+| Lifecycle hooks (`SubscribeBeforeStart`, `SubscribeAfterResourcesCreated`, BeforeStart pipeline phase) | → `aspireify` skill |
+| Endpoint authoring (`WithEndpoint` updates, `ExcludeReferenceEndpoint` flag) | → `aspireify` skill |
 | Deploy, publish, pipeline steps, `aspire destroy` | → `aspire-deployment` skill |
 | Logs, traces, metrics, dashboard, `aspire dashboard run` | → `aspire-monitoring` skill |
-| Deployed app diagnostics (GCP) | Cloud Logging and the runbooks in `docs/runbooks/`; not covered by this skill |
+| Deployed app diagnostics | → `azure-diagnostics` skill (azure-skills) |
 
 ## Runtime Settings And Environment
 
@@ -248,12 +248,12 @@ The same rule applies to any "file in use", "cannot access the file", or
 ## TypeScript AppHost Note
 
 Detection covers current `apphost.mts` and legacy `apphost.ts`, but **all TS AppHost
-authoring is out of scope here** (this repo uses a C# AppHost). The CLI-driven legacy migration is project
+authoring is delegated to `aspireify`**. The CLI-driven legacy migration is project
 maintenance owned by this orchestration skill, not authoring. Explain that it also updates
 Aspire packages, config, tsconfig, and imports; offer
 `aspire update --migrate --yes --non-interactive` only after approval for the full change,
-then check whether source authoring remains.
-Rules to apply for TypeScript AppHosts:
+then hand back to aspireify only if source authoring remains.
+Current rules to apply when handing off:
 
 | Rule | Why |
 |------|-----|
@@ -261,9 +261,25 @@ Rules to apply for TypeScript AppHosts:
 | Never edit `.aspire/modules/` directly | Generated; use `aspire add <package>` to regenerate and `aspire restore` to recover missing files |
 | Use `aspire docs api search <query> --language typescript` for API lookup | TS surface differs from C# |
 
-## AppHost authoring
+## Skill Routing — In-Plugin Sibling Skills
 
-This skill never edits AppHost code. AppHost API patterns are in [csharp-apphosts](../aspire/references/csharp-apphosts.md). The AppHost lives in `api/AppHost/`; check the `bcc-standards` skill (reference 02) before changing resources, ports, seeding or `--isolated` behaviour.
+After `aspire init` drops a skeleton AppHost + `aspire.config.json`, route AppHost wiring
+(scan repo → propose resource graph → edit AppHost → wire `Aspire.ServiceDefaults` / OTel →
+validate via `aspire start`) to the in-plugin **aspireify** skill: [`aspireify/SKILL.md`](https://github.com/microsoft/aspire-skills/blob/main/skills/aspireify/SKILL.md).
+For first-run flows that only need the skeleton drop, see the in-plugin **aspire-init** skill:
+[`aspire-init/SKILL.md`](https://github.com/microsoft/aspire-skills/blob/main/skills/aspire-init/SKILL.md). This orchestration skill stays focused
+on lifecycle (start/stop/wait/restart) and never edits AppHost code itself.
+
+## Project-Local Skill Precedence
+
+If `.agents/skills/aspire/SKILL.md` exists (from `aspire agent init`), defer to it for:
+C# AppHost editing, TS AppHost editing, Playwright handoff, investigation workflows.
+Safety guardrails from this plugin ALWAYS apply.
+
+If `.agents/skills/aspireify/SKILL.md` exists project-locally (installed by `aspire init` in
+current Aspire), **warn the user** that a project-local aspireify skill is present and **defer to it**
+for AppHost wiring instead of the in-plugin sibling. Same precedence rule as the project-local
+`aspire` skill above: project-local wins, plugin guardrails still apply.
 
 ## References
 

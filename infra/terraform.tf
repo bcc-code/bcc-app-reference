@@ -1,12 +1,11 @@
 terraform {
-  required_version = ">= 1.9.0"
+  # State is in the platform's Azure storage account; the platform's terraform.yml passes the backend configuration.
+  backend "azurerm" {}
 
-  # Partial configuration: the bucket and prefix are passed with -backend-config so the same code serves every
-  # environment (see README, "State"). infra.yml passes them in CI.
-  backend "gcs" {}
+  # The platform's terraform.yml runs 1.15.x. Keep this in step when the platform moves.
+  required_version = "~> 1.15"
 
   required_providers {
-    google      = { source = "hashicorp/google", version = "~> 7.0" }
-    google-beta = { source = "hashicorp/google-beta", version = "~> 7.0" }
+    google = { source = "hashicorp/google", version = "~> 7.0" }
   }
 }

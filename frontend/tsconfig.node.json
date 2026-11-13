@@ -1,6 +1,6 @@
 {
   "extends": "@tsconfig/node24/tsconfig.json",
-  "include": ["vite.config.*", "eslint.config.*", "knip.config.*", "openapi-ts.config.*", "playwright.config.*", "e2e/**/*"],
+  "include": ["vite.config.*", "eslint.config.*", "knip.config.*", "openapi-ts.config.*"],
   "compilerOptions": {
     "module": "preserve",
     "moduleResolution": "bundler",

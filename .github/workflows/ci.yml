@@ -1,0 +1,313 @@
+name: CI
+
+# No branch or path filter on pull_request: a stacked PR targets another branch, and a required check must always report.
+# Path filtering happens in the `changes` job (standard 05.1, 05.2).
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Keyed on the PR number: head_ref has no owner, so same-named fork branches would collide. Runs on main are not cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      infra: ${{ steps.filter.outputs.infra }}
+      architecture: ${{ steps.filter.outputs.architecture }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - id: filter
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Pushes to main and manual runs check everything.
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            printf 'backend=true\nfrontend=true\ninfra=true\narchitecture=true\n' >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          files=$(git diff --name-only "$BASE_SHA" HEAD)
+          # A change under .github/ can break any job, so it runs all of them (standard 05.3).
+          workflows=$(echo "$files" | grep -Eq '^\.github/' && echo true || echo false)
+          has() { if [ "$workflows" = true ] || echo "$files" | grep -Eq "$1"; then echo true; else echo false; fi; }
+          echo "backend=$(has '^(api/|Directory\.|global\.json|BccCode\.Template\.slnx|\.editorconfig|\.config/)')" >> "$GITHUB_OUTPUT"
+          echo "frontend=$(has '^(frontend/|api/BccCode\.Template\.Api/BccCode\.Template\.Api\.json)')" >> "$GITHUB_OUTPUT"
+          echo "infra=$(has '^infra/')" >> "$GITHUB_OUTPUT"
+          echo "architecture=$(has '^docs/architecture/')" >> "$GITHUB_OUTPUT"
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      # CI=true (set by GitHub Actions) turns on RestoreLockedMode in Directory.Build.props: the restore fails if a
+      # packages.lock.json is out of date.
+      - run: dotnet restore BccCode.Template.slnx
+      - run: dotnet build BccCode.Template.slnx --no-restore
+      # --long-running names a test that runs past 120 s, so a hang shows which test it is (standard 05.7). The unit tests need
+      # no Docker; the architecture tests read the built assemblies.
+      - run: dotnet test --project api/tests/BccCode.Template.Tests --no-build --long-running 120 --results-directory TestResults/unit --report-trx
+      - run: dotnet test --project api/tests/BccCode.Template.ArchitectureTests --no-build --long-running 120 --results-directory TestResults/architecture --report-trx
+      - name: Formatting and code style match .editorconfig
+        run: dotnet format BccCode.Template.slnx --verify-no-changes --no-restore || { echo "::error::Run dotnet format BccCode.Template.slnx and commit the result"; exit 1; }
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-test-results
+          path: TestResults/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Real host and seeder against a Postgres container (standard 19.3). Needs Docker, which ubuntu-latest has; the backend
+  # job's unit tests do not.
+  integration:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: dotnet restore BccCode.Template.slnx
+      - run: dotnet test --project api/tests/BccCode.Template.IntegrationTests --long-running 120 --results-directory TestResults/integration --report-trx
+      # Test results (TRX and logs) of a failed run.
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: integration-test-results
+          path: TestResults/integration/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The AppHost with Postgres, the schema step, the seeder and the API serving the built frontend, driven by Playwright
+  # (standard 19.4). Needs Docker and Chrome, which ubuntu-latest has: no `playwright install` download.
+  e2e:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          frontend: 'true'
+      - run: dotnet restore BccCode.Template.slnx
+      - run: pnpm --dir frontend build
+      - run: dotnet test --project api/tests/BccCode.Template.E2eTests --long-running 120
+        env:
+          E2E_BROWSER_CHANNEL: chrome
+      # Playwright traces and screenshots of the failed tests.
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-traces
+          path: TestResults/playwright/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # Wolverine pre-generation and the container build, as deploy.yml runs them (standard 05.5), then the built image against
+  # Postgres: db-apply, db-assert and a start in Production mode (static Wolverine code), as deploy.yml runs them after a
+  # merge. The frontend is not built here: wwwroot holds a stub shell, because every command of the image runs Program.cs,
+  # which serves it in Static mode.
+  codegen:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Throwaway database for this job only; the password is not a secret.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      # The image runs with --network host, so the service's published port is on 127.0.0.1.
+      ConnectionStrings__template: Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: dotnet run --project api/BccCode.Template.Api -c Release -- jasper codegen write
+      - name: Stub frontend shell
+        run: |
+          mkdir -p api/BccCode.Template.Api/wwwroot
+          echo '<!doctype html><title>template</title><meta property="csp-nonce" nonce="__CSP_NONCE__">' > api/BccCode.Template.Api/wwwroot/index.html
+      - run: dotnet publish api/BccCode.Template.Api -c Release /t:PublishContainer -p:ContainerImageTags='"ci"' -p:ContainerArchiveOutputPath=${{ runner.temp }}/api.tar
+      - run: docker load -i ${{ runner.temp }}/api.tar
+      - name: The image applies and asserts the schema
+        run: |
+          docker run --rm --network host -e ConnectionStrings__template bcc-template-api:ci jasper db-apply
+          docker run --rm --network host -e ConnectionStrings__template bcc-template-api:ci jasper db-assert
+      # Production mode, with the pre-generated Wolverine code the image carries.
+      # Production refuses to start without these. Placeholders: /health needs neither the IdP nor KMS. The Data Protection
+      # warm-up logs a credentials error for KMS here, which does not stop the app. Messaging__UsePubSub is unset, so
+      # internal messages stay in the local inbox and the Pub/Sub transport (which needs Google credentials) is off.
+      - name: The image starts and answers /health
+        env:
+          Oidc__Authority: https://oidc.invalid
+          Oidc__ClientId: ci
+          Oidc__ClientSecret: ci-placeholder
+          Gcp__DataProtectionKmsKeyName: projects/ci/locations/global/keyRings/ci/cryptoKeys/ci
+          Internal__PubSubAudience: ci-pubsub
+          Internal__PubSubServiceAccount: pubsub@ci.invalid
+          Internal__SchedulerAudience: ci-scheduler
+          Internal__SchedulerServiceAccount: scheduler@ci.invalid
+        run: |
+          docker run -d --name api --network host -e ConnectionStrings__template -e Oidc__Authority -e Oidc__ClientId -e Oidc__ClientSecret -e Gcp__DataProtectionKmsKeyName \
+            -e Internal__PubSubAudience -e Internal__PubSubServiceAccount -e Internal__SchedulerAudience -e Internal__SchedulerServiceAccount bcc-template-api:ci
+          trap 'docker logs api; docker rm -f api' EXIT
+          curl --silent --show-error --fail --max-time 5 --retry 30 --retry-delay 1 --retry-all-errors http://127.0.0.1:8080/health
+
+  contracts:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          frontend: 'true'
+      # Writes the OpenAPI document (Wolverine builds the host without starting it, so no database) and the client.
+      - run: pnpm --dir frontend generate
+      - name: The committed OpenAPI document is current
+        run: git diff --exit-code -- api/BccCode.Template.Api/BccCode.Template.Api.json || { echo "::error::Run pnpm --dir frontend generate and commit the result"; exit 1; }
+      - name: The generated client is current
+        run: git diff --exit-code -- frontend/src/client || { echo "::error::Run pnpm --dir frontend generate and commit frontend/src/client"; exit 1; }
+      # Same script as deploy.yml, so a broken SBOM step shows up on the PR. Not uploaded.
+      - name: SBOMs can be generated
+        run: bash .github/scripts/sbom.sh "${{ runner.temp }}/sbom" ci
+
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Dependabot's npm ecosystem can write a package-lock.json; pnpm-lock.yaml is the only lockfile (standard 17.4).
+      - name: Only pnpm-lock.yaml
+        run: |
+          npm_lockfiles=$(git ls-files '*package-lock.json' '*npm-shrinkwrap.json' '*yarn.lock')
+          if [ -n "$npm_lockfiles" ]; then echo "::error::Remove these lockfiles; this repo uses pnpm: $npm_lockfiles"; exit 1; fi
+      - uses: ./.github/actions/setup
+        with:
+          frontend: 'true'
+      # Check mode only: nothing here fixes files (standard 05.6, 21.21).
+      - run: pnpm --dir frontend type-check
+      - run: pnpm --dir frontend lint
+      - name: Formatting
+        run: pnpm --dir frontend format:check || { echo "::error::Run pnpm --dir frontend format and commit the result"; exit 1; }
+      - run: pnpm --dir frontend knip
+      - run: pnpm --dir frontend test
+      - run: pnpm --dir frontend build
+
+  # Needs no cloud credentials and no state (standard 03.6). The modules come from public repositories.
+  infra:
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The decide logic of preview.yml. Here because a change under .github/ runs this job.
+      - name: Preview decide script
+        run: bash .github/scripts/preview-decide.test.sh
+      # Same version as the platform's terraform.yml.
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.4
+          terraform_wrapper: false
+      - name: Formatting
+        run: terraform fmt -check -recursive infra || { echo "::error::Run terraform fmt -recursive infra and commit the result"; exit 1; }
+      # One root per entry; add the next root here.
+      - name: Validate
+        run: |
+          for root in infra infra/preview-shared infra/preview; do
+            terraform -chdir="$root" init -backend=false
+            terraform -chdir="$root" validate
+          done
+
+  # The C4 workspace parses, and the committed SVGs were exported from it and its layout (ADR 0018). Rendering needs a 2 GB browser image,
+  # so CI compares the hash export.sh records instead of exporting again.
+  architecture:
+    needs: changes
+    if: needs.changes.outputs.architecture == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: The DSL is valid
+        run: |
+          image=$(sed -n 's/^FROM \(.*\) AS structurizr$/\1/p' docs/architecture/Dockerfile)
+          docker run --rm -v "$PWD/docs/architecture:/usr/local/structurizr:ro" "$image" validate -workspace /usr/local/structurizr/workspace.dsl
+      - name: The exported diagrams are current
+        run: docs/architecture/export.sh --check || { echo "::error::Run docs/architecture/export.sh (or export.ps1) and commit docs/architecture/diagrams"; exit 1; }
+
+  # Runs on every change: a secret can be committed in any file.
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # The CLI in a container: gitleaks-action needs a paid licence for organisation repositories. Only the PR's commits
+      # are scanned, with redacted output. Images are pinned by digest; Dependabot does not update images in run steps.
+      - env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git /repo --redact --log-opts="$BASE_SHA..HEAD"
+
+  # SAST on every change (standard 17.10). Semgrep CE, not CodeQL: CodeQL needs the paid GitHub Code Security licence on a
+  # private repository.
+  sast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # --error fails the job on any finding from these rule sets.
+      # Excluded rule: npm-missing-minimum-release-age reads .npmrc only. The release-age quarantine is set in
+      # frontend/pnpm-workspace.yaml (minimumReleaseAge), where pnpm reads it.
+      - run: >-
+          docker run --rm -v "$PWD:/src" -w /src
+          semgrep/semgrep:1.180.0@sha256:529ee8a277ec8adc5b534d7c74eea0a47e9de21d62852b6ba7ac6ba9566845c3
+          semgrep scan --metrics=off --error
+          --config p/default --config p/csharp --config p/typescript
+          --exclude-rule package_managers.npm.npm-missing-minimum-release-age.npm-missing-minimum-release-age
+
+  # The one check to require in branch protection: skipped jobs count as passed, failed or cancelled ones do not.
+  ci:
+    if: always()
+    needs: [changes, backend, integration, e2e, codegen, contracts, frontend, infra, architecture, gitleaks, sast]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: echo "$NEEDS" | jq -e 'all(.[]; .result == "success" or .result == "skipped")'

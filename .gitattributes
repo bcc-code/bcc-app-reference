@@ -2,5 +2,5 @@
 *.png filter=lfs diff=lfs merge=lfs -text
 *.jpg filter=lfs diff=lfs merge=lfs -text
 # The committed OpenAPI document and the lock files are generated: collapse them in PR diffs.
-api/openapi/openapi.json linguist-generated=true
-**/packages.lock.json linguist-generated=true -diff
+api/BccCode.Template.Api/BccCode.Template.Api.json linguist-generated=true
+**/packages.lock.json linguist-generated=true

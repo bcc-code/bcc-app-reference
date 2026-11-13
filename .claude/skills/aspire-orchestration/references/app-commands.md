@@ -42,9 +42,26 @@ aspire init --language typescript
 - Use `aspire new` when creating a brand-new Aspire app from scratch.
 - Use `aspire init` when adding Aspire to an existing application.
 
-## After `aspire init`
+## After `aspire init` — Hand Off to `aspireify`
 
-Not needed in this repo, which already has an AppHost in `api/AppHost/`. For AppHost wiring patterns see [csharp-apphosts](../../aspire/references/csharp-apphosts.md).
+`aspire init` drops a minimal AppHost skeleton + AppHost configuration into the
+repo and installs the **`aspireify`** agent skill alongside it. `aspire init` itself does not
+wire resources, projects, or integrations. Hand off the wiring step to:
+
+1. The in-plugin sibling skill: [`../../aspireify/SKILL.md`](../../aspireify/SKILL.md), or
+2. The project-local `.agents/skills/aspireify/SKILL.md` if `aspire init` installed it
+   (project-local wins — defer to it and warn the user).
+
+The aspireify workflow:
+
+1. **Scan** the repository — discover .NET projects, Node.js apps, Python/Go services, docker-compose files
+2. **Present findings** — confirm with user which services to include
+3. **Wire the AppHost** — add resources using 3-tier API preference:
+   - Tier 1: First-party `Aspire.Hosting.*` (e.g., `AddPostgres`, `AddRedis`, `AddViteApp`, `AddNextJsApp`)
+   - Tier 2: Community Toolkit `CommunityToolkit.Aspire.Hosting.*` (e.g., `AddGolangApp`)
+   - Tier 3: Raw fallbacks (`AddExecutable`, `AddDockerfile`, `AddContainer`)
+4. **Configure dependencies** — ServiceDefaults for .NET, OTel for non-.NET
+5. **Validate** — `aspire start` until all resources are healthy
 
 ### Key Init Rules
 

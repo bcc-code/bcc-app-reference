@@ -1,81 +1,59 @@
 # Architecture
 
-The system as built, as C4 diagrams. The source is the Mermaid text in this file (rendered by GitHub and most editors).
+C4 model of the template application. The source is [workspace.dsl](workspace.dsl) (Structurizr DSL); the SVGs in [diagrams/](diagrams/) are exported from it. Why it is set up this way: [ADR 0018](../adrs/0018-c4-diagrams-with-structurizr.md).
 
-TODO: standard 23, rule 4 asks for an exported SVG next to the source. Export each diagram with `mmdc` (Mermaid CLI) or the
-Mermaid live editor into this folder when the diagrams have settled, and keep both in step.
+The model shows the Notes sample as built: the SPA served by the API on one origin, Postgres, the internal message topic, BCC Signon, the platform gateway and the BCC monitoring collector. An application made from the template renames the system in `workspace.dsl`, replaces the slices on the component view and adds its own integrations.
 
-## Context
+## Diagrams
 
-Who uses the application and which systems it talks to.
+### System context
 
-```mermaid
-C4Context
-    title Template: system context
-    Person(user, "Signed-in user", "Keeps personal notes")
-    Person(admin, "Administrator", "Reads note statistics")
-    System(app, "Template", "Web application for personal notes")
-    System_Ext(oidc, "OIDC provider", "BCC sign-on: login and back-channel logout")
-    System_Ext(gateway, "BCC platform gateway", "TLS, host name, routing")
+![System context](diagrams/SystemContext.svg)
 
-    Rel(user, gateway, "Uses", "HTTPS")
-    Rel(admin, gateway, "Uses", "HTTPS")
-    Rel(gateway, app, "Routes requests to")
-    Rel(app, oidc, "Authenticates users with", "OIDC code flow")
-    Rel(oidc, app, "Ends sessions at", "Back-channel logout")
-```
+### Containers
 
-## Containers
+![Containers](diagrams/Containers.svg)
 
-What runs and how requests flow. The API serves `index.html` and every `/api` route. Only the content-hashed bundles under
-`/assets` come from the bucket (standard 26).
+### Components of the API
 
-```mermaid
-C4Container
-    title Template: containers
-    Person(user, "User", "Browser")
-    System_Ext(oidc, "OIDC provider", "Login and back-channel logout")
+![Components](diagrams/Components.svg)
 
-    System_Boundary(gcp, "GCP project (one per environment)") {
-        Container(gw, "Platform gateway", "Cloud Load Balancing", "default backend: API; /assets/*: bucket")
-        Container(api, "API", "ASP.NET Core, Wolverine HTTP, Cloud Run", "BFF: login and session, Notes endpoints, serves index.html")
-        Container(bucket, "Assets bucket", "Cloud Storage, private", "Content-hashed JS and CSS bundles")
-        ContainerDb(db, "Database", "Cloud SQL for PostgreSQL", "Notes, sessions, Data Protection keys")
-        Container(pubsub, "Pub/Sub", "Topic, push subscription, dead-letter topic", "Integration messages from the outbox, pushed back to the API")
-        Container(scheduler, "Cloud Scheduler", "Cron job", "Calls the durability pass every minute")
-        Container(migrate, "Migration job", "Cloud Run job", "Applies the schema before each rollout")
-        Container(kms, "Key", "Cloud KMS", "Encrypts the Data Protection keys")
-        Container(secrets, "Secrets", "Secret Manager", "OIDC client secret")
-    }
+### Deployment: sandbox
 
-    Rel(user, gw, "Uses", "HTTPS")
-    Rel(gw, api, "Everything except /assets", "HTTPS")
-    Rel(gw, bucket, "/assets/*", "HTTPS")
-    Rel(api, oidc, "Authenticates users with", "OIDC code flow")
-    Rel(oidc, api, "Ends sessions at", "Back-channel logout")
-    Rel(api, db, "Reads and writes", "Npgsql through Cloud SQL Auth Proxy, IAM authentication")
-    Rel(api, pubsub, "Publishes outbox messages to")
-    Rel(pubsub, api, "Pushes messages to", "POST /internal/pubsub/messages, Google OIDC")
-    Rel(scheduler, api, "Sends unsent outbox rows", "POST /internal/durability/pass, Google OIDC")
-    Rel(migrate, db, "Applies schema to", "Same, as its own IAM user")
-    Rel(api, kms, "Encrypts keys with")
-    Rel(api, secrets, "Reads client secret from")
-```
+![Sandbox deployment](diagrams/SandboxDeployment.svg)
 
-The browser holds a session cookie only. Tokens stay on the server ([ADR 0004](../adrs/0004-bff-authentication-with-server-side-sessions.md)).
+### Deployment: PR preview
 
-Background work arrives as HTTP requests, because Cloud Run gives the API no CPU between requests. Wolverine runs in
-`ServerlessWithOutbox` mode ([ADR 0007](../adrs/0007-wolverine-serverless-with-outbox.md)): a message is stored in the outbox
-with the handler's transaction, published to Pub/Sub, and pushed back to `/internal/pubsub/messages`. Cloud Scheduler calls
-`/internal/durability/pass` to send what failed to send. The `/internal` routes accept only Google-signed tokens of their own
-service account and are not part of the OpenAPI document.
+![Preview deployment](diagrams/PreviewDeployment.svg)
 
-## Variants
+### Deployment: local
 
-The template has two APIs with the same behaviour and the same HTTP contract: `BccCode.Template.Api.Marten` (event-sourced
-notes) and `BccCode.Template.Api.EfCore` (relational notes). Both use `BccCode.Template.Web` for the shared HTTP plumbing.
-After `scripts/init-app.ps1` only one remains ([ADR 0003](../adrs/0003-marten-or-ef-core.md)).
+![Local deployment](diagrams/LocalDeployment.svg)
 
-## Local development
+## Edit the model
 
-The Aspire AppHost starts the API, Postgres, the OIDC mock and the frontend dev server. See [../development.md](../development.md).
+1. Start the app with `aspire run` and open the `architecture` resource (the "C4 diagrams" link in the dashboard). It takes about half a minute to start.
+2. Edit `workspace.dsl` and refresh the browser. Every view starts with `autolayout`. To lay a view out by hand, remove its `autolayout` line and drag the elements; Structurizr saves the positions to `workspace.json` a few seconds later.
+3. Export and commit `workspace.dsl`, `workspace.json` and `diagrams/` together:
+
+   ```powershell
+   ./docs/architecture/export.ps1
+   ```
+
+   ```bash
+   docs/architecture/export.sh
+   ```
+
+   The script applies the layout in `workspace.json` to the model in `workspace.dsl` and renders that. The first export pulls the `-playwright` image (about 2 GB). Both scripts give the same files.
+4. Check that the diagrams match the sources: `docs/architecture/export.sh --check` (no Docker needed).
+
+Open the diagrams in Structurizr before you export: after a DSL change it rewrites `workspace.json` once, and an export made before that is stale. CI's `architecture` job validates the DSL and fails when `diagrams/source.sha256` does not match `workspace.dsl`, `workspace.json` and the export image.
+
+Without Aspire, regenerate `workspace.json` from the DSL with the same image the export uses (`export -format json`), copy the result over `workspace.json`, then run the export script.
+
+## Rules of thumb
+
+- Describe each relationship by why it exists ("Counts notes"), not only the protocol.
+- Positions are matched by element name. Renaming an element in the DSL drops its position; place it again in Structurizr.
+- A new view needs a description and a section above.
+- The image versions are in [Dockerfile](Dockerfile). When Dependabot raises them, run the export on that PR.

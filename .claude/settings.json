@@ -7,7 +7,6 @@
       "Bash(pnpm --dir frontend run *)",
       "Bash(aspire describe *)",
       "WebFetch(domain:wolverinefx.net)",
-      "WebFetch(domain:martendb.io)",
       "WebFetch(domain:aspire.dev)"
     ]
   }

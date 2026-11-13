@@ -12,6 +12,9 @@ namespace OidcMock;
 
 public static class OidcEndpoints
 {
+    /// <summary>The BCC Signon claim the app keys its data by.</summary>
+    public const string PersonUidClaim = "https://login.bcc.no/claims/personUid";
+
     public static void MapOidcEndpoints(this WebApplication app)
     {
         app.MapMethods("/connect/authorize", ["GET", "POST"], (Delegate)AuthorizeAsync);
@@ -67,13 +70,13 @@ public static class OidcEndpoints
             $"""
              <form method="post" action="/login">
                <input type="hidden" name="returnUrl" value="{WebUtility.HtmlEncode(returnUrl)}">
-               <button name="persona" value="{p.Key}">{WebUtility.HtmlEncode(p.Name)} <small>({p.Key}{(p.Roles.Length > 0 ? ", " + string.Join(", ", p.Roles) : "")})</small></button>
+               <button name="persona" value="{p.Key}">{WebUtility.HtmlEncode(p.Name)} <small>({p.Key})</small><br><small>{WebUtility.HtmlEncode(p.Description)}</small></button>
              </form>
              """));
         return Results.Content($$"""
             <!doctype html>
             <html lang="en"><head><meta charset="utf-8"><title>OIDC mock</title>
-            <style>body{font-family:system-ui;max-width:28rem;margin:4rem auto}button{display:block;width:100%;margin:.5rem 0;padding:.75rem;font-size:1rem}</style></head>
+            <style>body{font-family:system-ui;max-width:28rem;margin:4rem auto}button{display:block;width:100%;margin:.5rem 0;padding:.75rem;font-size:1rem;text-align:left}</style></head>
             <body><h1>Sign in as</h1>{{buttons}}<p>Local development only. Not a real identity provider.</p></body></html>
             """, "text/html");
     }
@@ -84,10 +87,13 @@ public static class OidcEndpoints
 
         var claims = new List<Claim>
         {
-            new(Claims.Subject, person.Subject),
+            new(Claims.Subject, person.PersonUid),
             new(Claims.Name, person.Name),
+            new(PersonUidClaim, person.PersonUid),
             new("sid", Guid.NewGuid().ToString("N")),
+            new(Claims.AuthenticationMethodReference, "pwd"),
         };
+        if (person.Mfa) claims.Add(new Claim(Claims.AuthenticationMethodReference, "mfa"));
         claims.AddRange(person.Roles.Select(role => new Claim(Claims.Role, role)));
         await context.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
             new ClaimsPrincipal(new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme)));
