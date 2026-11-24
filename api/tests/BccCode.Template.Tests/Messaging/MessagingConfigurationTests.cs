@@ -99,13 +99,13 @@ public sealed class MessagingConfigurationTests
     }
 
     [Theory]
-    [InlineData("Production", AutoCreate.None)]
-    [InlineData("Sandbox", AutoCreate.None)]
-    [InlineData("Development", AutoCreate.CreateOrUpdate)]
-    [InlineData("Test", AutoCreate.CreateOrUpdate)]
-    public void Only_development_and_test_create_the_envelope_tables_at_startup(string environment, AutoCreate expected)
+    [InlineData("Production")]
+    [InlineData("Sandbox")]
+    [InlineData("Development")]
+    [InlineData("Test")]
+    public void No_environment_creates_the_envelope_tables_at_startup(string environment)
     {
-        Configure(environment, usePubSub: false).AutoBuildMessageStorageOnStartup.Should().Be(expected);
+        Configure(environment, usePubSub: false).AutoBuildMessageStorageOnStartup.Should().Be(AutoCreate.None);
     }
 
     [Fact]

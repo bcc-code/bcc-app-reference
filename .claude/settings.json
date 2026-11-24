@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/tools/worktree-cleanup/prune-volumes.mjs\"",
+            "command": "node \"$CLAUDE_PROJECT_DIR/tools/worktree-cleanup/prune-volumes.mjs\" --dry-run",
             "timeout": 30
           }
         ]

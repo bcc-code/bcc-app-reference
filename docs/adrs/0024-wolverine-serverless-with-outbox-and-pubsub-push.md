@@ -13,7 +13,7 @@ The API runs on Cloud Run with request-based billing (`cpu_idle = true`), so it 
 
 ## Decision
 
-**Mode.** `Durability.Mode = ServerlessWithOutbox` in every environment, so local runs and tests use the same mode as GCP. A cascaded message is stored in the outbox in the handler's EF Core transaction, sent after the commit inside the request, and its row deleted once the send is accepted. A failed send stays in the outbox. `AutoBuildMessageStorageOnStartup` is `None` outside Development and Test: the schema step owns the envelope tables ([0016](0016-schema-applied-by-a-deploy-step.md)).
+**Mode.** `Durability.Mode = ServerlessWithOutbox` in every environment, so local runs and tests use the same mode as GCP. A cascaded message is stored in the outbox in the handler's EF Core transaction, sent after the commit inside the request, and its row deleted once the send is accepted. A failed send stays in the outbox. `AutoBuildMessageStorageOnStartup` is `None` in every environment, local runs and tests included: the schema step owns the envelope tables ([0016](0016-schema-applied-by-a-deploy-step.md)).
 
 **Publishing and receiving.** Every message that leaves a handler implements `IInternalMessage` (or `IIntegrationEvent`, [0023](0023-pubsub-for-internal-messages-and-bcc-pubsub-for-events.md)) and is routed to one topic with `MessageBatchSize(1)`, so each message is pushed, retried and dead-lettered on its own. Architecture tests fail on any cascaded type without a marker, and on local queues. The push receiver answers 204 to acknowledge. The push mapper refuses (400) any type that is not an internal message. The sample is the message the archive slice cascades.
 

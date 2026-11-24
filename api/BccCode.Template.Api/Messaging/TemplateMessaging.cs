@@ -29,9 +29,10 @@ public static class TemplateMessaging
         // The pass lock must hold behind a transaction-mode pooler, where a session lock leaks onto a pooled connection. Safe
         // because no async daemon runs; an open transaction would stall its gap detection.
         options.Durability.UseTransactionScopedDurabilityPassLock = true;
-        // The schema never changes at API startup (standard 12): the schema step creates the envelope tables. With None Wolverine
-        // only checks that they exist, where the JasperFx Production default (CreateOrUpdate) diffs them on every cold start.
-        options.AutoBuildMessageStorageOnStartup = environment.IsDevelopmentOrTest() ? AutoCreate.CreateOrUpdate : AutoCreate.None;
+        // The schema never changes at API startup, in any environment (standard 12.6, ADR 0016): the schema step (`jasper db-apply`:
+        // the AppHost's schema resource, the test fixture, the deploy) creates the envelope tables, so code that only works because
+        // the app built its own tables fails locally too. With None Wolverine only checks that they exist.
+        options.AutoBuildMessageStorageOnStartup = AutoCreate.None;
         // The pass finds stale outbox rows by their timestamp. The index is created by the schema step, never by the app.
         options.Durability.EnableOutgoingTimestampIndex = true;
         // Poison messages are moved to wolverine_dead_letters; the durability pass deletes them after a week.

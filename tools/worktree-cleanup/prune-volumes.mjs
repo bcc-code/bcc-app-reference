@@ -3,7 +3,9 @@
 // api/AppHost); the volume outlives the worktree unless something removes it. The sole instance's `bcc-template-postgres` is
 // never touched.
 //
-// Runs from the SessionStart hook in .claude/settings.json, and by hand:
+// "Live" means a worktree of this clone. An isolated run of a separate clone has a slug this clone does not know, so its volume
+// looks orphaned here. The SessionStart hook in .claude/settings.json therefore only lists (--dry-run); remove by hand after
+// reading the list:
 //   node tools/worktree-cleanup/prune-volumes.mjs [--dry-run]
 // Prints nothing and exits 0 when git or Docker is not available. A volume a container still uses is left alone (docker refuses
 // to remove it).

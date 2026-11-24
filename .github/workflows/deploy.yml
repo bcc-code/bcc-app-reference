@@ -302,7 +302,7 @@ jobs:
           psql -w -v ON_ERROR_STOP=1 -c "REASSIGN OWNED BY CURRENT_USER TO \"$DB_OWNER_ROLE\"" \
             "host=127.0.0.1 port=5432 dbname=$DB_NAME user=$db_user"
           # AutoCreate.None validates nothing, so check the target database matches the image's configuration before the
-          # rollout (Marten docs, schema/migrations).
+          # rollout: the EF Core migrations and Wolverine's envelope tables.
           jasper db-assert
 
       # By digest, so the revision runs exactly the image that was pushed (standard 06.3). Service flags such as --region
@@ -471,7 +471,7 @@ jobs:
           psql -w -v ON_ERROR_STOP=1 -c "REASSIGN OWNED BY CURRENT_USER TO \"$DB_OWNER_ROLE\"" \
             "host=127.0.0.1 port=5432 dbname=$DB_NAME user=$db_user"
           # AutoCreate.None validates nothing, so check the target database matches the image's configuration before the
-          # rollout (Marten docs, schema/migrations).
+          # rollout: the EF Core migrations and Wolverine's envelope tables.
           jasper db-assert
 
       # By digest, so the revision runs exactly the image that was pushed (standard 06.3). Service flags such as --region

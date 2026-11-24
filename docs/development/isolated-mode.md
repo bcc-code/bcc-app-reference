@@ -39,10 +39,11 @@ and a large seed makes it larger (Orginn's are about 275 MB each). The container
 that is not running uses no memory or CPU. On Docker Desktop for Windows the volumes live in the WSL2 virtual disk, which does not
 always shrink by itself after volumes are removed; Docker Desktop's clean-up or compacting the virtual disk gives the space back.
 
-`tools/worktree-cleanup/prune-volumes.mjs` removes the volumes of worktrees that no longer exist (`--dry-run` lists them). It runs
-at the start of every Claude Code session from the `SessionStart` hook in `.claude/settings.json`, and prints nothing when there
-is nothing to do or Docker is not running. It never touches `bcc-template-postgres` or a volume a container uses. Run it by hand
-after removing worktrees outside Claude Code:
+`tools/worktree-cleanup/prune-volumes.mjs` removes the volumes of worktrees that no longer exist (`--dry-run` lists them). It only
+knows the worktrees of the clone it runs in: an isolated run of a separate clone looks orphaned, and its database would go. So the
+`SessionStart` hook in `.claude/settings.json` runs it with `--dry-run` and only lists what it would remove; it prints nothing when
+there is nothing to do or Docker is not running. It never touches `bcc-template-postgres` or a volume a container uses. Check the
+list, then remove them by hand:
 
 ```bash
 node tools/worktree-cleanup/prune-volumes.mjs

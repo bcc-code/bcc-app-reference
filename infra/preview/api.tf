@@ -28,6 +28,8 @@ locals {
     Internal__SchedulerServiceAccount = google_service_account.scheduler.email
 
     # Cloud Run terminates TLS; this makes Request.IsHttps follow X-Forwarded-Proto (UseHsts, the OIDC redirect URI).
+    # Previews take all ingress on run.app, not only the gateway, so X-Forwarded-For can be set by any caller here: nothing may
+    # base a decision on RemoteIpAddress in a preview (standard 16.16).
     ASPNETCORE_FORWARDEDHEADERS_ENABLED = "true"
 
     Gcp__ProjectId                = local.project_id

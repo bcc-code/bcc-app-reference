@@ -96,7 +96,7 @@ Fixed ports and the persistent Postgres container belong to the one default inst
 shared database and writes into another instance's data without any error. `aspire run --isolated` (or `aspire start --isolated`) uses
 random ports, a database volume of its own (`bcc-template-<folder>-postgres`, so a restart skips the seed) and its own browser
 address `https://template-<folder>.dev.localhost:<port>`, because cookies are per host name and not per port. Get the real URLs with
-`aspire describe`. The `SessionStart` hook (`tools/worktree-cleanup/prune-volumes.mjs`) removes the volumes of deleted worktrees
+`aspire describe`. The `SessionStart` hook (`tools/worktree-cleanup/prune-volumes.mjs --dry-run`) lists the volumes of deleted worktrees; remove them by hand
 ([isolated mode](docs/development/isolated-mode.md)). The Aspire MCP server only picks up an AppHost under the agent's working
 directory; for one in a worktree, call `select_apphost` with its path first. E2E runs (`E2E=true`) also get random ports, start on an
 empty database and serve the built `frontend/dist` instead of Vite.
