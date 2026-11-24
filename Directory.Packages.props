@@ -39,7 +39,7 @@
          3.x makes IOpenApiMediaType.Example read-only, breaking the AspNetCore OpenAPI source generator. -->
     <PackageVersion Include="Microsoft.OpenApi" Version="[2.12.0,3.0.0)" />
     <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />
-    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.10.0" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="11.0.1" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery.Yarp" Version="10.10.0" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.10.0" />
   </ItemGroup>
