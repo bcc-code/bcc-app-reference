@@ -34,7 +34,7 @@
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.12" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
-    <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="11.0.0" />
     <!-- Pinned to 2.x: Microsoft.AspNetCore.OpenApi 10.0.x is built against Microsoft.OpenApi 2.x.
          3.x makes IOpenApiMediaType.Example read-only, breaking the AspNetCore OpenAPI source generator. -->
     <PackageVersion Include="Microsoft.OpenApi" Version="[2.12.0,3.0.0)" />
