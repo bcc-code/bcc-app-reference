@@ -13,6 +13,7 @@ public static class TemplateWeb
 {
     public static void AddTemplateWeb(this WebApplicationBuilder builder, string apiTitle)
     {
+        builder.Environment.AssertNotLocalInCloudRun(builder.Configuration);
         builder.AddTemplateSecurityHeaders();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddProblemDetails(o => o.CustomizeProblemDetails = Problems.Customize);

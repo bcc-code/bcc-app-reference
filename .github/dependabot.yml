@@ -50,6 +50,10 @@ updates:
       # engines in frontend/package.json and @tsconfig/node<major>. Raise them by hand in one PR.
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
+      # TypeScript 7 (the native compiler) drops the JS compiler API that typescript-eslint, vue-tsc and @hey-api/openapi-ts
+      # use, so its major breaks lint, type-check and client generation. Move by hand once those tools support it.
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
     groups:
       bcc:
         patterns: ['@bcc-code/*']

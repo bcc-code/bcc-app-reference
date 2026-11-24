@@ -36,7 +36,10 @@ public static class Extensions
         builder.Services.ConfigureHttpClientDefaults(http =>
         {
             // Wolverine retries the handlers, so unsafe methods (POST, PUT, ...) are retried at that one layer only.
-            http.AddStandardResilienceHandler(o => o.Retry.DisableForUnsafeHttpMethods());
+            // One pipeline, and so one circuit breaker, per host: the BCC platform clients share the default client name, and a
+            // pipeline per name lets a failing service (PubSub publishes) open the circuit for the others (Core API calls).
+            // Hosts come only from configuration, so the number of pipelines stays small.
+            http.AddStandardResilienceHandler(o => o.Retry.DisableForUnsafeHttpMethods()).SelectPipelineByAuthority();
             http.AddServiceDiscovery();
         });
         return builder;

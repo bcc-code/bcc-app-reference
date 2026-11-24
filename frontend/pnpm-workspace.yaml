@@ -16,3 +16,5 @@ overrides:
   # @hey-api/json-schema-ref-parser pins js-yaml 4.2.0 exactly, which has GHSA-52cp-r559-cp3m, GHSA-5p4m-2wfm-xmqj and
   # GHSA-2883-xcg3-v3hh (fixed in 4.3.2). Drop once Hey API ships a fixed pin.
   js-yaml: 4.3.2
+  # GHSA-g3hv-75wg-m249 is fixed only in 11.x; eslint and typescript-eslint still ask for ^10. Drop once they accept 11.
+  minimatch@10: 11.0.2
