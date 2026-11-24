@@ -57,9 +57,10 @@ const runtimeKeys: { pattern: RegExp; builtBy: string }[] = [
 ]
 
 function isUsed(key: string): boolean {
-  const escaped = key.replaceAll('.', String.raw`\.`)
-  const quoted = new RegExp(`['"\`]${escaped}['"\`]`)
-  return quoted.test(frontendSource) || quoted.test(backendSource) || runtimeKeys.some(({ pattern }) => pattern.test(key))
+  // Plain substring checks instead of a RegExp built from the key: semgrep blocks non-literal RegExp (sast job).
+  const quoted = ["'", '"', '`'].map((quote) => `${quote}${key}${quote}`)
+  const inSource = (source: string) => quoted.some((literal) => source.includes(literal))
+  return inSource(frontendSource) || inSource(backendSource) || runtimeKeys.some(({ pattern }) => pattern.test(key))
 }
 
 function placeholders(text: string): string[] {
