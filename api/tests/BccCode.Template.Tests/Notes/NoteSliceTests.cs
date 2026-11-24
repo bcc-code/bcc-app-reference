@@ -1,5 +1,4 @@
 using BccCode.Template.Notes;
-using BccCode.Template.Persistence;
 using BccCode.Template.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -159,14 +158,6 @@ public class NoteSliceTests
         body.Value.Should().BeEmpty();
         NoteBody.TryParse(new string('x', 10_000), out _).Should().BeNull();
         NoteBody.TryParse(new string('x', 10_001), out _).Should().Be("errors.note.bodyTooLong");
-    }
-
-    [Fact]
-    public void The_time_a_write_stores_is_cut_to_the_microseconds_postgres_keeps()
-    {
-        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 10, 19, 8, 0, 0, TimeSpan.Zero).AddTicks(7));
-
-        PostgresTime.Now(clock).Ticks.Should().Be(new DateTimeOffset(2026, 10, 19, 8, 0, 0, TimeSpan.Zero).Ticks);
     }
 
     [Fact]

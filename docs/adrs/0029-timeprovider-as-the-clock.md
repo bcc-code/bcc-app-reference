@@ -16,7 +16,6 @@ We will use `TimeProvider` as the one clock and `DateTimeOffset` for stored inst
 
 - Code gets the time from an injected `TimeProvider`, never from `DateTime.Now`, `DateTime.UtcNow` or `DateTimeOffset.UtcNow`. `BannedSymbols.txt` and the banned-API analyzer make them a build error (RS0030), and the feature project also bans `TimeProvider.System`, which only the host's composition root may use.
 - Tests use `FakeTimeProvider`. The seeder passes its own clock, so seeded notes can carry earlier times.
-- The time a write stores comes from `TimeProvider`, cut to microseconds by `PostgresTime.Now`.
 - An application whose domain needs calendar dates or time zone rules decides for itself, with an ADR that supersedes this one. bcc-ateam's ADR 0028 and its dates-and-times guide are the starting point.
 
 ## Consequences
@@ -24,7 +23,7 @@ We will use `TimeProvider` as the one clock and `DateTimeOffset` for stored inst
 | | |
 |---|---|
 | Positive | Follows standard 11.7 with no deviation. No extra packages, no second JSON setup, no clock adapter. A new contributor already knows the types. |
-| Negative | A date and an instant are both `DateTimeOffset` or `DateOnly`, so the type does not stop a mix-up, and Oslo-local rules use `TimeZoneInfo`. |
+| Negative | A date and an instant are both `DateTimeOffset` or `DateOnly`, so the type does not stop a mix-up, and Oslo-local rules use `TimeZoneInfo`. A write returns the clock's time to 100 ns while Postgres stores microseconds, so a later read can be up to 1 µs earlier; clients compare `version`, not timestamps. |
 | Follow-up | Revisit when an application in the template's family needs calendar dates in several places. |
 
 ## Alternatives considered
