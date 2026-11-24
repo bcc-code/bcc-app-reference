@@ -58,12 +58,9 @@ internal static class DatabaseResources
                 });
     }
 
-    // A persistent container has to outlive the AppHost's endpoint proxy, so the proxy is off for it. WithEndpointProxySupport is
-    // experimental.
+    // A persistent container has to outlive the AppHost's endpoint proxy, so the proxy is off for it.
     private static void KeepDataBetweenRuns(IResourceBuilder<PostgresServerResource> postgres)
     {
-#pragma warning disable ASPIREPROXYENDPOINTS001
         postgres.WithDataVolume("bcc-template-postgres").WithLifetime(ContainerLifetime.Persistent).WithEndpointProxySupport(false);
-#pragma warning restore ASPIREPROXYENDPOINTS001
     }
 }

@@ -163,8 +163,8 @@ Each rule says why, and which test or guard enforces it (standard 24.3).
   `AutoCreate.None` everywhere. Schema changes are additive, so a traffic rollback stays safe.
 - **Business values that change without a deploy are stored data**, not constants or `appsettings` (a season's dates, contact details),
   changed on a settings page by an administrator. A value another system owns, a URL or a secret stays configuration.
-- **Packages:** central versions in `Directory.Packages.props`; lock files are committed (the AppHost and E2E projects have none: Aspire's
-  packages depend on the host OS). A transitive-only pin needs a reason: advisory id and the chain that pulls it in.
+- **Packages:** central versions in `Directory.Packages.props`; lock files are committed for every project, the AppHost and E2E projects included (Aspire 17 no longer
+  adds host-OS packages). A transitive-only pin needs a reason: advisory id and the chain that pulls it in.
 - **pnpm is pinned** in `frontend/package.json` (`devEngines`, `onFail: download`); the supply-chain block is in
   `frontend/pnpm-workspace.yaml`, and a package younger than 7 days is rejected on purpose (`minimumReleaseAge`).
 - **Analyzers run in the build** (`AnalysisLevel` latest-recommended, `EnforceCodeStyleInBuild`, expression-bodied methods are warnings,
@@ -219,7 +219,8 @@ with IAM authentication, behind the platform gateway; only `/assets/*` comes fro
 - Commit the OpenAPI document together with the regenerated frontend client (`pnpm --dir frontend generate`).
 - Aspire's default watch is off (`aspire.config.json`). The AppHost adds the projects by path (`AddDotnetProject`), and
   `dotnet watch` (SDK 11.0.1xx) only starts projects in the AppHost's `ProjectReference` graph, so every start fails with
-  "IDE returned unexpected status code 500". Restart a changed service from the dashboard or with
+  "IDE returned unexpected status code 500". Aspire 17's own watch runner fails on Windows too (its log socket refuses the
+  connection and DCP reports the same 500, so `schema` and `oidc` never start). Restart a changed service from the dashboard or with
   `aspire resource <name> rebuild`. Aspire plans watch for path-based projects (`aspire run --watch`); turn it on once that ships.
 - Release builds use Wolverine static code generation. Generate it first (`jasper codegen write`, see Commands), then build Release. The
   generated folder `api/BccCode.Template.Api/Internal/Generated` is gitignored. .NET 11 container images are Ubuntu 26.04, so the base

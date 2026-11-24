@@ -4,14 +4,14 @@
     "net11.0": {
       "Aspire.Npgsql": {
         "type": "Direct",
-        "requested": "[13.6.5, )",
-        "resolved": "13.6.5",
-        "contentHash": "NSQLgK6Kq+zxWncqcwXP0Evhtfh5vaEjyOGuO7ePpoTF/yi3rMWdhIUzuyzd3q5ZfSRbyu8b/WLg6nKrOoKBkw==",
+        "requested": "[17.0.0, )",
+        "resolved": "17.0.0",
+        "contentHash": "s+nCQDTZXc8AVk+2lG/TBx0YMa5ey3PDvCn17I8WIx4KhoJR+EiTp/Z8lcx2YNURV5CIHTVQfiqXCATRqTAfIg==",
         "dependencies": {
           "AspNetCore.HealthChecks.NpgSql": "9.0.0",
           "Npgsql.DependencyInjection": "10.0.3",
           "Npgsql.OpenTelemetry": "10.0.3",
-          "OpenTelemetry.Extensions.Hosting": "1.17.0"
+          "OpenTelemetry.Extensions.Hosting": "1.18.0"
         }
       },
       "BccCode.PubSub.Wolverine": {

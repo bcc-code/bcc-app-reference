@@ -14,11 +14,6 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
-  <!-- The Aspire SDK adds packages for the host OS (Aspire.Dashboard.Sdk.<rid>), so a lock file for the AppHost, or for the E2E tests
-       that reference it, cannot match on both Windows and the Linux runners. Neither is deployed. -->
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'AppHost' or '$(MSBuildProjectName)' == 'BccCode.Template.E2eTests'">
-    <RestorePackagesWithLockFile>false</RestorePackagesWithLockFile>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(CI)' == 'true' or '$(ContinuousIntegrationBuild)' == 'true'">
     <!-- CI (GitHub Actions sets CI=true) restores exactly what packages.lock.json says. -->
     <RestoreLockedMode>true</RestoreLockedMode>

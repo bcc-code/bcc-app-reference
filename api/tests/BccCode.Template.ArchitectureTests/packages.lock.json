@@ -610,16 +610,16 @@
       },
       "Microsoft.Extensions.Diagnostics.HealthChecks": {
         "type": "Transitive",
-        "resolved": "10.0.14",
-        "contentHash": "QwCCJ8J80dwDgNk4YZJWjFqq0UEoiNr3E3V7ZQRQLdlgkYS6MmB3gn5rQe2rc8Y815CpCy5DIujcRxYEksJK+g==",
+        "resolved": "11.0.0",
+        "contentHash": "jiU/dYtXl/bN1fgF9z83hrS924XqMX5WVIelHflKy3C3hckgcQnMGfwTPM3CRSV7kOKzALZ8PrA3H6zsRlANaA==",
         "dependencies": {
-          "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions": "10.0.14"
+          "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions": "11.0.0"
         }
       },
       "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions": {
         "type": "Transitive",
-        "resolved": "10.0.14",
-        "contentHash": "Rz5jWujGFSbOL7lBrw5gHegramz+hFpXb2lWX0amGRUFZFkxbCtgQisy05nqm1KehrZJJInB8ahLGbdOl/cQsA=="
+        "resolved": "11.0.0",
+        "contentHash": "O6Yxj7A2ciRF2NdG80gCAFhWSiVJ0bps+QyFhjWmV/zJktD8NFuEawmm7byrQ/y4oWifs5M6zk4/klEKC1xf5Q=="
       },
       "Microsoft.Extensions.Features": {
         "type": "Transitive",
@@ -1241,7 +1241,7 @@
       "bcccode.template.api": {
         "type": "Project",
         "dependencies": {
-          "Aspire.Npgsql": "[13.6.5, )",
+          "Aspire.Npgsql": "[17.0.0, )",
           "BccCode.PubSub.Wolverine": "[1.0.49, )",
           "BccCode.Template": "[1.0.0, )",
           "Google.Cloud.Kms.V1": "[3.27.0, )",
@@ -1277,18 +1277,18 @@
       },
       "Aspire.Npgsql": {
         "type": "CentralTransitive",
-        "requested": "[13.6.5, )",
-        "resolved": "13.6.5",
-        "contentHash": "NSQLgK6Kq+zxWncqcwXP0Evhtfh5vaEjyOGuO7ePpoTF/yi3rMWdhIUzuyzd3q5ZfSRbyu8b/WLg6nKrOoKBkw==",
+        "requested": "[17.0.0, )",
+        "resolved": "17.0.0",
+        "contentHash": "s+nCQDTZXc8AVk+2lG/TBx0YMa5ey3PDvCn17I8WIx4KhoJR+EiTp/Z8lcx2YNURV5CIHTVQfiqXCATRqTAfIg==",
         "dependencies": {
           "AspNetCore.HealthChecks.NpgSql": "9.0.0",
-          "Microsoft.Extensions.Configuration.Binder": "10.0.14",
-          "Microsoft.Extensions.Configuration.EnvironmentVariables": "10.0.14",
-          "Microsoft.Extensions.Diagnostics.HealthChecks": "10.0.14",
-          "Microsoft.Extensions.Logging": "10.0.14",
+          "Microsoft.Extensions.Configuration.Binder": "11.0.0",
+          "Microsoft.Extensions.Configuration.EnvironmentVariables": "11.0.0",
+          "Microsoft.Extensions.Diagnostics.HealthChecks": "11.0.0",
+          "Microsoft.Extensions.Logging": "11.0.0",
           "Npgsql.DependencyInjection": "10.0.3",
           "Npgsql.OpenTelemetry": "10.0.3",
-          "OpenTelemetry.Extensions.Hosting": "1.17.0"
+          "OpenTelemetry.Extensions.Hosting": "1.18.0"
         }
       },
       "BccCode.PubSub.Wolverine": {

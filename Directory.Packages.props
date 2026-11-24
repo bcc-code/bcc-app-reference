@@ -5,10 +5,7 @@
   </PropertyGroup>
   <!-- Transitive pins: a package that no project references directly may only be pinned here with a reason that cites the
        advisory (GHSA/CVE id from NU1901-NU1904), bug or version conflict, and names the chain that pulls it in.
-       One so far (below). -->
-  <ItemGroup Label="Transitive pins (MessagePack 2.5.302 comes in through Aspire.Hosting and StreamJsonRpc in the AppHost; it has GHSA-qhrr-8q5h-9q3h, fixed in 2.5.303; pinned to the latest 2.5.x)">
-    <PackageVersion Include="MessagePack" Version="2.5.307" />
-  </ItemGroup>
+       None at the moment (Aspire 17 requires MessagePack 2.5.307 itself). -->
   <ItemGroup Label="Critter stack (one Wolverine version)">
     <PackageVersion Include="WolverineFx" Version="6.64.0" />
     <PackageVersion Include="WolverineFx.Http" Version="6.64.0" />
@@ -64,11 +61,12 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.21.0" />
   </ItemGroup>
   <ItemGroup Label="Aspire">
-    <PackageVersion Include="Aspire.Hosting.Dotnet" Version="13.6.5-preview.1.26559.7" />
-    <PackageVersion Include="Aspire.Hosting.JavaScript" Version="13.6.5" />
-    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.6.5" />
-    <PackageVersion Include="Aspire.Npgsql" Version="13.6.5" />
-    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.PostgreSQL.Extensions" Version="13.6.1" />
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Hosting.Dotnet" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Hosting.JavaScript" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="17.0.0" />
+    <PackageVersion Include="Aspire.Npgsql" Version="17.0.0" />
+    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.PostgreSQL.Extensions" Version="17.0.0" />
   </ItemGroup>
   <ItemGroup Label="Tests">
     <PackageVersion Include="xunit.v3" Version="4.0.3" />
@@ -77,7 +75,7 @@
     <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />
     <PackageVersion Include="Alba" Version="9.0.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
-    <PackageVersion Include="Aspire.Hosting.Testing" Version="13.6.5" />
+    <PackageVersion Include="Aspire.Hosting.Testing" Version="17.0.0" />
     <PackageVersion Include="Microsoft.Playwright" Version="1.64.1" />
     <PackageVersion Include="Deque.AxeCore.Playwright" Version="4.14.0" />
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="11.0.0" />
