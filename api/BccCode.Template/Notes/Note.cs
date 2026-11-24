@@ -1,22 +1,17 @@
-using BccCode.Template.Changes;
-
 namespace BccCode.Template.Notes;
 
 /// <summary>
 /// A note of one person; the owner is the BCC person uid. The setters are private: the state changes only through
-/// <see cref="Create"/>, <see cref="Edit"/> and <see cref="Archive"/>, which name the business step on the <see cref="Change"/>
-/// the request made (<see cref="Audited.Record"/>) and so keep <see cref="Audited.Version"/> moving. The version is the
-/// concurrency token, and the client sends it back to prove it edited the latest. Never returned from an endpoint.
+/// <see cref="Create"/>, <see cref="Edit"/> and <see cref="Archive"/>, which keep <see cref="Version"/> moving. The version is
+/// the concurrency token, and the client sends it back to prove it edited the latest. Never returned from an endpoint.
 /// </summary>
-public class Note : Audited
+public class Note
 {
-    public const string Created = "NoteCreated";
-    public const string Edited = "NoteEdited";
-    public const string Archived = "NoteArchived";
-
     protected Note()
     {
     }
+
+    public Guid Id { get; private set; }
 
     public Guid OwnerId { get; private set; }
 
@@ -28,50 +23,35 @@ public class Note : Audited
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    /// <summary>
-    /// Set when the note is archived. An archive is a removal that keeps the row: a query filter hides it, and the change that
-    /// archived it says who and when. Rows are never deleted by the app (ADR 0028).
-    /// </summary>
-    public DateTimeOffset? RemovedAt { get; private set; }
+    /// <summary>Set when the note is archived. An archive keeps the row: a query filter hides it. Rows are never deleted by the app.</summary>
+    public DateTimeOffset? ArchivedAt { get; private set; }
 
-    protected override Guid SubjectId => Id;
+    /// <summary>1 on insert, one more on every edit and archive. EF's concurrency token: a stale save fails and answers 409.</summary>
+    public int Version { get; private set; }
 
-    public static Note Create(Guid id, Change change, Guid ownerId, NoteContent content)
+    public static Note Create(Guid id, DateTimeOffset now, Guid ownerId, NoteContent content)
     {
-        var note = new Note
+        return new Note
         {
             Id = id,
             OwnerId = ownerId,
             Title = content.Title.Value,
             Body = content.Body.Value,
-            CreatedAt = change.At,
-            UpdatedAt = change.At,
+            CreatedAt = now,
+            UpdatedAt = now,
+            Version = 1,
         };
-        note.Record(change, Created);
-        return note;
     }
 
-    public void Edit(Change change, NoteContent content)
+    public void Edit(DateTimeOffset now, NoteContent content)
     {
-        (Title, Body, UpdatedAt) = (content.Title.Value, content.Body.Value, change.At);
-        Record(change, Edited);
+        (Title, Body, UpdatedAt) = (content.Title.Value, content.Body.Value, now);
+        Version++;
     }
 
-    public void Archive(Change change, string? comment = null)
+    public void Archive(DateTimeOffset now)
     {
-        (RemovedAt, UpdatedAt) = (change.At, change.At);
-        Record(change, Archived, comment);
+        (ArchivedAt, UpdatedAt) = (now, now);
+        Version++;
     }
-}
-
-/// <summary>An earlier version of a <see cref="Note"/>, from <c>note_history</c>.</summary>
-public sealed class NoteVersion : Note, IReplacedVersion
-{
-    private NoteVersion()
-    {
-    }
-
-    public DateTimeOffset ReplacedAt { get; private set; }
-
-    public Guid? ReplacedBy { get; private set; }
 }

@@ -25,7 +25,6 @@ export function createAppRouter(queryClient: QueryClient = sharedQueryClient, hi
       { path: '/notes', component: () => import('@/notes/NotesListPage.vue') },
       { path: '/notes/new', component: () => import('@/notes/NoteCreatePage.vue') },
       { path: '/notes/:noteId/edit', component: () => import('@/notes/NoteEditPage.vue'), props: true },
-      { path: '/notes/:noteId/history', component: () => import('@/notes/NoteHistoryPage.vue'), props: true },
       { path: '/admin/stats', component: () => import('@/admin/StatsPage.vue'), meta: { allowed: mayOpenStats } },
       { path: '/no-access', name: 'no-access', component: () => import('@/components/NoAccessPage.vue') },
       { path: '/:pathMatch(.*)*', component: () => import('@/components/NotFoundPage.vue') },

@@ -5,7 +5,8 @@ resource "google_service_account" "api" {
   display_name = "${local.app}-api (${local.slug})"
 }
 
-# The OIDC mock has no database, so it gets an account of its own that holds neither the group membership nor the key.
+# The OIDC mock gets an account of its own. It reaches the database for its signing keys, but holds neither the API's KMS key nor
+# the client secret.
 resource "google_service_account" "mock" {
   account_id   = "sa-${local.app}-mock-${local.slug}"
   display_name = "${local.app} OIDC mock (${local.slug})"
@@ -18,6 +19,7 @@ locals {
     "roles/logging.logWriter",
   ]
   mock_roles = [
+    "roles/cloudsql.client",
     "roles/logging.logWriter",
   ]
 }
@@ -52,6 +54,17 @@ resource "google_cloud_identity_group_membership" "api" {
   group = local.props.shared_db.admin_group_id
   preferred_member_key {
     id = google_service_account.api.email
+  }
+  roles {
+    name = "MEMBER"
+  }
+}
+
+# Database access for the OIDC mock's signing keys, in the same group.
+resource "google_cloud_identity_group_membership" "mock" {
+  group = local.props.shared_db.admin_group_id
+  preferred_member_key {
+    id = google_service_account.mock.email
   }
   roles {
     name = "MEMBER"

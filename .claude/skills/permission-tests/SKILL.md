@@ -95,15 +95,15 @@ Rules for these tests:
 ## Ownership tests (15.8, 15.9)
 
 Endpoint-level policy lets a caller through when the resource does not exist or belongs to someone else, so each endpoint that takes
-a resource id closes that gap in `Permission` (here `GET /api/notes/{noteId}`, `.../history`, `POST .../edit`, `POST .../archive`).
+a resource id closes that gap in `Permission` (here `GET /api/notes/{noteId}`, `POST .../edit`, `POST .../archive`).
 For each:
 
 1. Call it with an **unknown** id as a signed-in user. Expect **404**, no body.
 2. Create a resource as one user, then call it as **another user**. Expect **403**, no body. The resource exists and the caller may
    not use it (15.8); 404 is only for a resource whose existence is itself personal data, which a note is not.
 3. Call it with an **archived** resource, where the rules say archived counts as missing. Expect **404**.
-4. After a rejected write, assert that **nothing was written**: the row is unchanged, the version did not move, no `change` row was
-   added and no `_history` row exists (`Every_write_to_a_foreign_note_answers_403_and_to_an_unknown_one_404_and_stores_nothing`
+4. After a rejected write, assert that **nothing was written**: the row is unchanged, the version did not move and no row was
+   added (`Every_write_to_a_foreign_note_answers_403_and_to_an_unknown_one_404_and_stores_nothing`
    in `NotesApiTests` is the model).
 
 A 409 for a stale version and a 400 for an invalid body are separate tests, not part of the ownership rule.

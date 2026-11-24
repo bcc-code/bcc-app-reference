@@ -3,7 +3,6 @@
 Terraform for the app in GCP, on the BCC landing zone, one file per concern (standard 03). One root module, applied once per
 environment (`sandbox`, `prod`), each in its own GCP project with its own state. The landing zone provides the project, the CI
 account `sa-gha-cicd`, the Terraform state and the shared Cloud SQL instance; this Terraform only reads them. See
-[ADR 0028](../docs/adrs/0028-relational-domain-data-with-typed-history.md) for the persistence design and
 [ADR 0024](../docs/adrs/0024-wolverine-serverless-with-outbox-and-pubsub-push.md) for the messaging design.
 
 `template` in resource names is replaced by the app's slug when `scripts/init-app.ps1` initialises a copy (`app` in `main.tf`).

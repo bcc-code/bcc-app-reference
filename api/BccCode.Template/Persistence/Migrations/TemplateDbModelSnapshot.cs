@@ -22,87 +22,21 @@ namespace BccCode.Template.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("BccCode.Template.Changes.Actor", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid?>("PersonUid")
-                        .HasColumnType("uuid")
-                        .HasColumnName("person_uid");
-
-                    b.HasKey("Id")
-                        .HasName("pk_actor");
-
-                    b.HasIndex("PersonUid")
-                        .IsUnique()
-                        .HasDatabaseName("ix_actor_person_uid");
-
-                    b.ToTable("actor", (string)null);
-                });
-
-            modelBuilder.Entity("BccCode.Template.Changes.Change", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid?>("ActorId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("actor_id");
-
-                    b.Property<DateTimeOffset>("At")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("at");
-
-                    b.Property<long>("Position")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint")
-                        .HasColumnName("position");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Position"));
-
-                    b.Property<string>("Reason")
-                        .HasColumnType("text")
-                        .HasColumnName("reason");
-
-                    b.Property<Guid?>("SubjectId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("subject_id");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("type");
-
-                    b.HasKey("Id")
-                        .HasName("pk_change");
-
-                    b.HasIndex("ActorId")
-                        .HasDatabaseName("ix_change_actor_id");
-
-                    b.HasIndex("SubjectId", "Position")
-                        .HasDatabaseName("ix_change_subject_id_position");
-
-                    b.ToTable("change", (string)null);
-                });
-
             modelBuilder.Entity("BccCode.Template.Notes.Note", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTimeOffset?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at");
+
                     b.Property<string>("Body")
                         .IsRequired()
                         .HasMaxLength(10000)
                         .HasColumnType("character varying(10000)")
                         .HasColumnName("body");
-
-                    b.Property<Guid>("ChangeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("change_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -111,10 +45,6 @@ namespace BccCode.Template.Persistence.Migrations
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid")
                         .HasColumnName("owner_id");
-
-                    b.Property<DateTimeOffset?>("RemovedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("removed_at");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -134,71 +64,11 @@ namespace BccCode.Template.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_note");
 
-                    b.HasIndex("ChangeId")
-                        .HasDatabaseName("ix_note_change_id");
-
                     b.HasIndex("OwnerId", "CreatedAt")
                         .HasDatabaseName("ix_note_owner_id_created_at")
-                        .HasFilter("removed_at is null");
+                        .HasFilter("archived_at is null");
 
                     b.ToTable("note", (string)null);
-                });
-
-            modelBuilder.Entity("BccCode.Template.Notes.NoteVersion", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<int>("Version")
-                        .HasColumnType("integer")
-                        .HasColumnName("version");
-
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("body");
-
-                    b.Property<Guid>("ChangeId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("change_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<Guid>("OwnerId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_id");
-
-                    b.Property<DateTimeOffset?>("RemovedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("removed_at");
-
-                    b.Property<DateTimeOffset>("ReplacedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("replaced_at");
-
-                    b.Property<Guid?>("ReplacedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("replaced_by");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("title");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("updated_at");
-
-                    b.HasKey("Id", "Version")
-                        .HasName("pk_note_history");
-
-                    b.ToTable("note_history", null, t =>
-                        {
-                            t.ExcludeFromMigrations();
-                        });
                 });
 
             modelBuilder.Entity("BccCode.Template.Persistence.AuthSessionRow", b =>
@@ -259,27 +129,6 @@ namespace BccCode.Template.Persistence.Migrations
                         .HasName("pk_data_protection_keys");
 
                     b.ToTable("data_protection_keys", (string)null);
-                });
-
-            modelBuilder.Entity("BccCode.Template.Changes.Change", b =>
-                {
-                    b.HasOne("BccCode.Template.Changes.Actor", null)
-                        .WithMany()
-                        .HasForeignKey("ActorId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_change_actors_actor_id");
-                });
-
-            modelBuilder.Entity("BccCode.Template.Notes.Note", b =>
-                {
-                    b.HasOne("BccCode.Template.Changes.Change", "Change")
-                        .WithMany()
-                        .HasForeignKey("ChangeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_note_change_change_id");
-
-                    b.Navigation("Change");
                 });
 #pragma warning restore 612, 618
         }

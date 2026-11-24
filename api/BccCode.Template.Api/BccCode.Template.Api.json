@@ -93,16 +93,6 @@
                 }
               }
             }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetails"
-                }
-              }
-            }
           }
         }
       },
@@ -289,45 +279,6 @@
           }
         }
       }
-    },
-    "/api/notes/{noteId}/history": {
-      "get": {
-        "tags": [
-          "Notes"
-        ],
-        "summary": "GET_api_notes_noteId_history",
-        "description": "getNoteHistory",
-        "operationId": "GetNoteHistory",
-        "parameters": [
-          {
-            "name": "noteId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GetNoteHistoryResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        }
-      }
     }
   },
   "components": {
@@ -342,13 +293,6 @@
             "type": "integer",
             "description": "The version the client last read; a different stored version answers 409.",
             "format": "int32"
-          },
-          "comment": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "Why the note is archived, if the person says; stored as the reason of the change."
           }
         }
       },
@@ -480,25 +424,6 @@
           }
         }
       },
-      "GetNoteHistoryResponse": {
-        "required": [
-          "id",
-          "entries"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "entries": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NoteHistoryItem"
-            }
-          }
-        }
-      },
       "GetNoteResponse": {
         "required": [
           "id",
@@ -562,43 +487,6 @@
             "items": {
               "$ref": "#/components/schemas/NoteItem"
             }
-          }
-        }
-      },
-      "NoteHistoryItem": {
-        "required": [
-          "at",
-          "step",
-          "version",
-          "title",
-          "comment"
-        ],
-        "type": "object",
-        "properties": {
-          "at": {
-            "type": "string",
-            "description": "When the step was taken.",
-            "format": "date-time"
-          },
-          "step": {
-            "type": "string",
-            "description": "The business step: `NoteCreated`, `NoteEdited` or `NoteArchived`."
-          },
-          "version": {
-            "type": "integer",
-            "description": "The version of the note the step wrote.",
-            "format": "int32"
-          },
-          "title": {
-            "type": "string",
-            "description": "The note's title after the step, read from the version the step wrote."
-          },
-          "comment": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "The reason the person gave for the step, if any."
           }
         }
       },

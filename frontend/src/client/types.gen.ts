@@ -9,10 +9,6 @@ export type ArchiveNoteRequest = {
    * The version the client last read; a different stored version answers 409.
    */
   version: number
-  /**
-   * Why the note is archived, if the person says; stored as the reason of the change.
-   */
-  comment?: null | string
 }
 
 export type CreateNoteRequest = {
@@ -64,11 +60,6 @@ export type GetMeResponse = {
   roles: Array<string>
 }
 
-export type GetNoteHistoryResponse = {
-  id: string
-  entries: Array<NoteHistoryItem>
-}
-
 export type GetNoteResponse = {
   id: string
   title: string
@@ -85,29 +76,6 @@ export type GetStatsResponse = {
 
 export type ListNotesResponse = {
   notes: Array<NoteItem>
-}
-
-export type NoteHistoryItem = {
-  /**
-   * When the step was taken.
-   */
-  at: string
-  /**
-   * The business step: `NoteCreated`, `NoteEdited` or `NoteArchived`.
-   */
-  step: string
-  /**
-   * The version of the note the step wrote.
-   */
-  version: number
-  /**
-   * The note's title after the step, read from the version the step wrote.
-   */
-  title: string
-  /**
-   * The reason the person gave for the step, if any.
-   */
-  comment: null | string
 }
 
 export type NoteItem = {
@@ -208,10 +176,6 @@ export type PostApiNotesErrors = {
    * Bad Request
    */
   400: ProblemDetails
-  /**
-   * Conflict
-   */
-  409: ProblemDetails
 }
 
 export type PostApiNotesError = PostApiNotesErrors[keyof PostApiNotesErrors]
@@ -327,32 +291,3 @@ export type PostApiNotesByNoteIdEditResponses = {
 }
 
 export type PostApiNotesByNoteIdEditResponse = PostApiNotesByNoteIdEditResponses[keyof PostApiNotesByNoteIdEditResponses]
-
-export type GetApiNotesByNoteIdHistoryData = {
-  body?: never
-  path: {
-    noteId: string
-  }
-  query?: never
-  url: '/api/notes/{noteId}/history'
-}
-
-export type GetApiNotesByNoteIdHistoryErrors = {
-  /**
-   * Forbidden
-   */
-  403: unknown
-  /**
-   * Not Found
-   */
-  404: unknown
-}
-
-export type GetApiNotesByNoteIdHistoryResponses = {
-  /**
-   * OK
-   */
-  200: GetNoteHistoryResponse
-}
-
-export type GetApiNotesByNoteIdHistoryResponse = GetApiNotesByNoteIdHistoryResponses[keyof GetApiNotesByNoteIdHistoryResponses]

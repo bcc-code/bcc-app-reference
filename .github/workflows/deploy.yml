@@ -46,6 +46,7 @@ jobs:
     outputs:
       sha: ${{ steps.sha.outputs.sha }}
       is_tip: ${{ steps.sha.outputs.is_tip }}
+      deploy: ${{ steps.changes.outputs.deploy }}
     steps:
       - id: sha
         shell: bash
@@ -73,10 +74,38 @@ jobs:
           # Whether this is the current tip of main; `terraform` only runs then (see there).
           tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
           if [ "$sha" = "$tip" ]; then echo "is_tip=true" >> "$GITHUB_OUTPUT"; else echo "is_tip=false" >> "$GITHUB_OUTPUT"; fi
-          echo "Deploying $sha" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.sha.outputs.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      # Deploys only when something that goes into the image, the assets or the sandbox infrastructure changed, so a push to
+      # main that changes only docs or tests does not roll every environment. A manual run always deploys. The diff is against
+      # the first parent (the whole PR for a merge commit); if it cannot be computed, the run deploys to be safe.
+      - id: changes
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          set -euo pipefail
+          deploy=true
+          if [ "$EVENT" = workflow_run ] && changed=$(git diff --name-only "${SHA}^" "$SHA" 2>/dev/null); then
+            deployable='^(api/|frontend/|infra/|Directory\.Build\.props$|Directory\.Packages\.props$|global\.json$|BccCode\.Template\.slnx$|\.config/dotnet-tools\.json$|\.github/workflows/deploy\.yml$|\.github/actions/)'
+            notdeployed='^api/tests/|^api/AppHost/|\.test\.ts$'
+            # No grep -q in this pipe: it exits on the first match, the first grep then dies of SIGPIPE on a large diff, and
+            # pipefail turns that into "nothing to deploy".
+            if [ -z "$(grep -E "$deployable" <<<"$changed" | grep -vE "$notdeployed" || true)" ]; then
+              deploy=false
+              echo "Nothing deployable changed in $SHA; skipping the deploy." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+          if [ "$deploy" = true ]; then echo "Deploying $SHA" >> "$GITHUB_STEP_SUMMARY"; fi
 
   build:
     needs: gate
+    if: needs.gate.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -130,7 +159,7 @@ jobs:
   # keeps the current infrastructure instead of applying infra/ from a commit that is not the one being deployed (standard 06.2).
   terraform:
     needs: gate
-    if: needs.gate.outputs.is_tip == 'true'
+    if: needs.gate.outputs.is_tip == 'true' && needs.gate.outputs.deploy == 'true'
     concurrency:
       group: deploy-sandbox
       cancel-in-progress: false

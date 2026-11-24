@@ -5,6 +5,7 @@ using Npgsql;
 namespace BccCode.Template.IntegrationTests.Hosting;
 
 /// <summary>A PR preview runs in its own schema: db-apply creates every table there and none in public.</summary>
+[Collection(SerialCollectionDefinition.Name)]
 public sealed class SchemaNameTests(AppFixture fixture) : AppTest(fixture)
 {
     private const string SCHEMA = "pr1";
@@ -20,13 +21,13 @@ public sealed class SchemaNameTests(AppFixture fixture) : AppTest(fixture)
         (await SchemaCommands.RunAsync("db-assert", connectionString, settings)).Should().Be(0);
 
         var inSchema = await TablesAsync(connectionString, SCHEMA);
-        // Wolverine's envelope tables and the EF Core tables (ADR 0028) go to the same schema: the history twin, the migration
-        // history and the host's own tables included.
+        // Wolverine's envelope tables and the EF Core tables go to the same schema: the migration history
+        // and the host's own tables included.
         inSchema.Should().Contain(["wolverine_incoming_envelopes", "wolverine_outgoing_envelopes", "wolverine_dead_letters"]);
-        inSchema.Should().Contain(["change", "actor", "note", "note_history", "auth_sessions", "data_protection_keys", "__ef_migrations_history"]);
+        inSchema.Should().Contain(["note", "auth_sessions", "data_protection_keys", "__ef_migrations_history"]);
         (await TablesAsync(connectionString, "public")).Should().BeEmpty("nothing is created in public for a preview");
 
-        // The host maps its tables to the schema, the history trigger writes to the twin in the same schema, and the outbox is there too.
+        // The host maps its tables to the schema, the notes are written to it, and the outbox is there too.
         await using var host = await Fixture.StartHostAsync(new Dictionary<string, string?>
         {
             ["ConnectionStrings:template"] = connectionString,
@@ -38,8 +39,7 @@ public sealed class SchemaNameTests(AppFixture fixture) : AppTest(fixture)
         await host.Scenario(s => { s.As(user); s.Post.Json(new EditNoteRequest("Edited", "", note.Version)).ToUrl($"/api/notes/{note.Id}/edit"); s.StatusCodeShouldBeOk(); });
         await host.Scenario(s => { s.As(user); s.Post.Json(new ArchiveNoteRequest(2)).ToUrl($"/api/notes/{note.Id}/archive"); s.StatusCodeShouldBe(204); });
 
-        (await CountAsync(connectionString, $"{SCHEMA}.note_history")).Should().Be(2);
-        (await CountAsync(connectionString, $"{SCHEMA}.change")).Should().Be(3);
+        (await CountAsync(connectionString, $"{SCHEMA}.note where version = 3 and archived_at is not null")).Should().Be(1);
         (await TablesAsync(connectionString, "public")).Should().BeEmpty();
     }
 

@@ -9,7 +9,7 @@ How to run, test and change the application locally, split by task (standard 23.
 | [Personas](personas.md) | Test users in the OIDC mock |
 | [Tests](tests.md) | Unit, integration, architecture and E2E tests, and the checks CI runs |
 | [Contract flow](contract-flow.md) | Change the API and regenerate the OpenAPI document and the client |
-| [Database and migrations](database-and-migrations.md) | EF Core migrations, history twins, the schema step, previews |
+| [Database and migrations](database-and-migrations.md) | EF Core migrations, versions and archiving, the schema step, the database snapshot, previews |
 | [Messaging locally](messaging-locally.md) | Internal messages, the local inbox and the durability pass |
 | [Repository settings](repository-settings.md) | What cannot be set from the repository |
 

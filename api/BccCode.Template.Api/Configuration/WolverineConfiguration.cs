@@ -32,7 +32,7 @@ public static class WolverineConfiguration
             // The outbox and Wolverine's EF transaction need a message store. It lives in the app's schema of the same database
             // (a PR preview has its own) and is created by `jasper db-apply`, never at startup.
             options.PersistMessagesWithPostgresql(connectionString, schema);
-            // Eager: an explicit transaction around the endpoint, so the change, the rows and their history commit together (ADR 0028).
+            // Eager: an explicit transaction around the endpoint, so the rows and the outbox messages of a request commit together.
             options.UseEntityFrameworkCoreTransactions(TransactionMiddlewareMode.Eager);
             options.Policies.AutoApplyTransactions();   // one request, one transaction
             options.UseSystemTextJsonForSerialization();
@@ -77,8 +77,6 @@ public static class WolverineConfiguration
             options.UseFluentValidationProblemDetailMiddleware();
             // A CallerAccess parameter is loaded once per request, never read from the body.
             options.AddParameterHandlingStrategy<CallerAccessParameterStrategy>();
-            // A Change parameter is the request's business step (ADR 0028), never read from the body.
-            options.AddParameterHandlingStrategy<ChangeParameterStrategy>();
             // A stale version and a second writer of one row answer 409 on every transactional chain, listed in the OpenAPI document.
             options.AddPolicy<ConflictPolicy>();
             // Permission runs after LoadAsync and before Before and Validate (standard 09.2).

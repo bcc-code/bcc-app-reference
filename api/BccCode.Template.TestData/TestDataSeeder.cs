@@ -8,13 +8,13 @@ namespace BccCode.Template.TestData;
 /// Runs every seed step, and the reset. Seeding is idempotent (fixed ids), so it can run on every start and on a database that is
 /// already seeded. Both entry points check <see cref="SeedingGate"/>.
 /// </summary>
-public sealed class TestDataSeeder(IDbContextFactory<TemplateDb> dbs, TimeProvider time, IHostEnvironment environment, TestDataLog log, SeedState state)
+public sealed class TestDataSeeder(IDbContextFactory<TemplateDb> dbs, IHostEnvironment environment, TestDataLog log, SeedState state)
 {
     public async Task SeedAsync(CancellationToken cancellationToken)
     {
         SeedingGate.EnsureAllowed(environment);
         await using var db = await dbs.CreateDbContextAsync(cancellationToken);
-        var added = await SeedNotes.RunAsync(db, SeedNotes.Owner, time, cancellationToken);
+        var added = await SeedNotes.RunAsync(db, SeedNotes.Owner, cancellationToken);
         log.Seeded(added);
         state.Completed = true;
     }

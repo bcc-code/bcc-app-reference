@@ -7,7 +7,7 @@ using Npgsql;
 namespace BccCode.Template.Api.Configuration;
 
 /// <summary>
-/// The relational store (ADR 0028): <see cref="TemplateDb"/> on the app's connection, its tables in the schema of
+/// The relational store: <see cref="TemplateDb"/> on the app's connection, its tables in the schema of
 /// <see cref="PersistenceSchema"/>. The schema step applies its migrations (<see cref="TemplateMigrations"/>); the app never does.
 /// </summary>
 public static class EntityFrameworkConfiguration

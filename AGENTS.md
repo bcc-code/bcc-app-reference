@@ -5,11 +5,10 @@ docs, specs and ADRs instead of copying them.
 
 BCC App Template: a template for new BCC applications. .NET 11 backend (Wolverine.HTTP, EF Core on Postgres), Vue 3 frontend (BCC
 component library, Tailwind 4, TanStack Query, generated Hey API client), orchestrated with .NET Aspire. One sample app, the
-personal Notes, with a typed history table per audited table and a `change` table of business steps
-([ADR 0028](docs/adrs/0028-relational-domain-data-with-typed-history.md)). `scripts/init-app.ps1` turns a copy into a real app: it
+personal Notes, with optimistic concurrency (`version`) and soft removal (archiving); there is no audit trail or history yet
+([tech debt](docs/tech-debt/audit-history-not-in-the-template.md)). `scripts/init-app.ps1` turns a copy into a real app: it
 renames `BccCode.Template` to `BccCode.<App>` and moves the ports. Standards live in `.claude/skills/bcc-standards`. Wolverine
-rules and where this repo applies them are in the `wolverine` skill; adding an audited entity is in the `relational-slice`
-skill. Decisions are ADRs in `docs/adrs/`.
+rules and where this repo applies them are in the `wolverine` skill. Decisions are ADRs in `docs/adrs/`.
 
 ## Start Here
 
@@ -18,8 +17,7 @@ skill. Decisions are ADRs in `docs/adrs/`.
   the cross-origin check, ProblemDetails, SPA hosting (`Frontend/`), Pub/Sub and BCC PubSub (`Internal/`, `Messaging/`) and
   Wolverine settings. `Configuration/TemplateWeb.cs` is the entry point (ADR 0025).
 - `api/BccCode.Template/` holds the features, one folder per feature and one file per endpoint (`Notes/EditNote.cs` holds
-  `EditNoteEndpoint`): `Notes/`, `Users/`, `Admin/`, the `TemplateDb` context with its migrations (`Persistence/`) and `Changes/` (the
-  history mechanism). `api/BccCode.Template.TestData/` is the seeder (`SeedingGate`, health = seeded, `Seeder:Once`).
+  `EditNoteEndpoint`): `Notes/`, `Users/`, `Admin/`, the `TemplateDb` context with its migrations (`Persistence/`). `api/BccCode.Template.TestData/` is the seeder (`SeedingGate`, health = seeded, `Seeder:Once`).
 - Tests mirror the folders: unit tests in `api/tests/BccCode.Template.Tests/` (no Docker), integration tests in
   `api/tests/BccCode.Template.IntegrationTests/` (Alba + Testcontainers Postgres), architecture tests in
   `api/tests/BccCode.Template.ArchitectureTests/`, E2E tests in `api/tests/BccCode.Template.E2eTests/` (Playwright on the AppHost, ADR 0017).
@@ -65,6 +63,7 @@ dotnet run --project api/BccCode.Template.Api -c Release -- jasper codegen write
 dotnet publish api/BccCode.Template.Api -c Release /t:PublishContainer              # container image; needs Docker
 dotnet run --project api/BccCode.Template.Api -- jasper db-apply    # EF migrations, then Wolverine's tables, on ConnectionStrings:template; jasper db-assert checks
 dotnet ef migrations add <Name> --project api/BccCode.Template --startup-project api/BccCode.Template.Api
+node tools/db-snapshot/update.mjs                                   # regenerate the committed database snapshot after a migration or a seeder change (Docker)
 terraform fmt -check -recursive infra
 terraform -chdir=infra init -backend=false; terraform -chdir=infra validate                          # the same for infra/preview-shared and infra/preview
 
@@ -95,9 +94,12 @@ and `admin-no-mfa` (admin role without one: sign-in ends on the second-factor pa
 
 Fixed ports and the persistent Postgres container belong to the one default instance; a non-isolated run in a worktree attaches to the
 shared database and writes into another instance's data without any error. `aspire run --isolated` (or `aspire start --isolated`) uses
-random ports and a throwaway Postgres without a volume. Get the real URLs with `aspire describe`. The Aspire MCP server only picks up
-an AppHost under the agent's working directory; for one in a worktree, call `select_apphost` with its path first. E2E runs (`E2E=true`)
-also get random ports and serve the built `frontend/dist` instead of Vite.
+random ports, a database volume of its own (`bcc-template-<folder>-postgres`, so a restart skips the seed) and its own browser
+address `https://template-<folder>.dev.localhost:<port>`, because cookies are per host name and not per port. Get the real URLs with
+`aspire describe`. The `SessionStart` hook (`tools/worktree-cleanup/prune-volumes.mjs`) removes the volumes of deleted worktrees
+([isolated mode](docs/development/isolated-mode.md)). The Aspire MCP server only picks up an AppHost under the agent's working
+directory; for one in a worktree, call `select_apphost` with its path first. E2E runs (`E2E=true`) also get random ports, start on an
+empty database and serve the built `frontend/dist` instead of Vite.
 
 ## Contract flow
 
@@ -149,10 +151,9 @@ Each rule says why, and which test or guard enforces it (standard 24.3).
   policy (`InternalPubSub`, `InternalScheduler`) on the `GoogleOidc` bearer scheme. Startup fails when an internal setting is missing or a
   route lacks its policy (`InternalRouteGuard`). The push mapper refuses (400) any type that is not an `IInternalMessage`.
   `Internal:AllowAll=true` is for local runs and tests only; the host refuses it outside Development and Test.
-- **Every change to an audited row goes through an entity method that calls `Record(change, "<Step>")`.** The `Change` is built once per
-  request and passed in. `version` is the concurrency token (409), and the `history_track` trigger copies the replaced version to
-  `<table>_history` and refuses an update that skips this, so never change a domain row with SQL outside the migration's rules.
-  Removal is soft (`removed_at`, hidden by a query filter). `HistoryTests` checks twin parity and the trigger.
+- **A row changes only through its entity's methods, which take the time and raise `version`.** `version` is the concurrency token
+  (409 on a stale save). Removal is soft (`archived_at`, hidden by a query filter). Endpoints take a `TimeProvider` and use
+  `PostgresTime.Now`, which cuts the time to the microseconds Postgres keeps, so what a write returns equals what a read returns.
 - **Time comes from `TimeProvider`**, never `DateTime(Offset).Now/UtcNow/Today`. `BannedSymbols.txt` and the banned-API analyzer make it a
   build error (RS0030); the feature project also bans `TimeProvider.System`, which only the host's composition root may use. Not NodaTime
   ([ADR 0029](docs/adrs/0029-timeprovider-as-the-clock.md)).
@@ -196,7 +197,8 @@ One Cloud Run service (`bcc-template-api-<env>`) in a GCP project from the platf
 with IAM authentication, behind the platform gateway; only `/assets/*` comes from a bucket (ADR 0013). Environments: `sandbox`, `prod`,
 `dev` (previews) and `preview`.
 
-- `deploy.yml` runs when `CI` succeeds on `main` (or manually): build the image once (artifacts, no cloud credentials), apply Terraform for
+- `deploy.yml` runs when `CI` succeeds on `main` and the commit changed something deployable (`api/` outside the tests and the
+  AppHost, `frontend/` outside the tests, `infra/`, the build files), or manually: build the image once (artifacts, no cloud credentials), apply Terraform for
   sandbox, push, upload assets additively, apply the schema (`db-apply` from the pushed image through the Cloud SQL Auth Proxy, then
   `REASSIGN OWNED`, then `db-assert`), roll out by digest, send traffic `--to-latest`, smoke test. After approval of the `prod` environment,
   `deploy-prod` pushes the same tarball and stops if the digest differs (ADR 0014, 0016).
@@ -215,18 +217,20 @@ with IAM authentication, behind the platform gateway; only `/assets/*` comes fro
 ## Gotchas
 
 - Commit the OpenAPI document together with the regenerated frontend client (`pnpm --dir frontend generate`).
+- Aspire's default watch is off (`aspire.config.json`). The AppHost adds the projects by path (`AddDotnetProject`), and
+  `dotnet watch` (SDK 11.0.1xx) only starts projects in the AppHost's `ProjectReference` graph, so every start fails with
+  "IDE returned unexpected status code 500". Restart a changed service from the dashboard or with
+  `aspire resource <name> rebuild`. Aspire plans watch for path-based projects (`aspire run --watch`); turn it on once that ships.
 - Release builds use Wolverine static code generation. Generate it first (`jasper codegen write`, see Commands), then build Release. The
   generated folder `api/BccCode.Template.Api/Internal/Generated` is gitignored. .NET 11 container images are Ubuntu 26.04, so the base
   image is `resolute-chiseled-extra` (`ContainerFamily`); `noble-*` tags do not exist for 11.
 - Wolverine's outbox and dead-letter tables hold message bodies, so a message with personal data goes into the data inventory. Its relay
   of the `user-name` header is off (`EnableRelayOfUserName`), because it would write display names.
-- A migration that creates an audited table or adds a column to one ends with `migrationBuilder.Sql(HistorySql.Sync("<table>"))`, and the
-  history twin is mapped with `HistoryMapping.ConfigureHistory`; the parity test in `HistoryTests` fails when either is missing.
 - Wolverine binds the request body for `Before` and `Validate` only when the endpoint method (`Post`) takes the request too. A `Post` that
   has no use for it keeps the parameter and suppresses IDE0060 with a reason (`ArchiveNoteEndpoint`).
 - `GenerateDocumentationFile` is on, so the `dotnet format` fix for CS1573 (a doc comment that documents some parameters but not all)
   inserts empty `<param>` tags. Write the missing tags instead of keeping the empty ones.
-- The internal message `NoteArchivedMessage` is what leaves the endpoint; the `NoteArchived` change step is the record in the database.
+- The internal message `NoteArchivedMessage` is what leaves the endpoint; the archived note itself is the row with `archived_at` set.
 - `Wolverine.Runtime` has an `IInternalMessage` of its own: a file that uses both needs an alias or a qualified name.
 - Logout must be a real HTML form POST to `/auth/logout`, because the response redirects through the identity provider; `fetch` cannot
   follow it. The cross-origin check covers it, so the form carries no token.
@@ -235,6 +239,7 @@ with IAM authentication, behind the platform gateway; only `/assets/*` comes fro
 - The persona person uids are written once, in `api/OidcMock/Personas.cs`; the seeder, the integration tests and the E2E tests compile that
   file in as a link. Seeding runs only in the environments `SeedingGate` allows (Development, Test, Sandbox, Preview).
 - `dotnet test` uses the Microsoft.Testing.Platform runner (`global.json`): pass `--project` or `--solution`, not a bare path.
+- A migration or a seeder change needs `node tools/db-snapshot/update.mjs`: a new database starts from the committed snapshot in `api/BccCode.Template.TestData/Snapshots/`, and `DatabaseSnapshotTests` fails when it is older than the newest migration. The seeder must stay deterministic (fixed ids and dates, no clock).
 
 ## Not set up yet
 
@@ -251,7 +256,6 @@ Project skills are in `.claude/skills/` and agents in `.claude/agents/`.
 | `bcc-standards` (skill) | Writing or changing code, config, CI, infra or docs, adding an endpoint, slice, migration, test or workflow, or checking whether something follows the BCC standards. |
 | `standards-reviewer` (agent) | Reviewing the current diff or a path against the standards. Read-only. Returns findings by severity with file:line and rule id. |
 | `wolverine` | Writing or reviewing a handler, endpoint, message, middleware, error policy or messaging configuration. |
-| `relational-slice` | Adding an audited entity, a business step, a migration or a slice that writes data. |
 | `aspire`, `aspire-orchestration`, `aspire-monitoring`, `dotnet-inspect` | Generated by `aspire agent init` (see Commands); do not edit by hand. AppHost and CLI, starting and stopping the app (`--isolated` runs), resource state, logs and traces, and looking up .NET package and API facts. |
 | `playwright-cli` | Driving a browser from the command line for checks, tests and captures. |
 | `screenshot` | Capturing screenshots with committed scripts, for PRs, bug reports and docs images. |
@@ -264,7 +268,8 @@ Project skills are in `.claude/skills/` and agents in `.claude/agents/`.
 ## Team process
 
 - Branch names: `<type>/<short-description>` (for example `feat/note-sharing`, `fix/archive-409`), or the ClickUp task id when the work
-  comes from a task.
+  comes from a task. A session that starts on a generated `claude/…` branch renames it to that form before the first push
+  (`git branch -m <new-name>`), so the remote never gets the generated name.
 - Commit messages: an imperative sentence as the subject, with no type prefix; the body says why.
 - Pull request descriptions: Summary, Changes, Review notes, Testing, plus Privacy (`.github/pull_request_template.md`).
 - Work items live in ClickUp (`clickup-tasks`, `clickup-work` skills). Architecture decisions are ADRs in `docs/adrs/`.

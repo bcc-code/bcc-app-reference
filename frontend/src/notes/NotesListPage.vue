@@ -40,10 +40,6 @@ const { mutate: archive, error: archiveError, variables: archiving } = useArchiv
           <p class="m-0 mt-1 line-clamp-2 whitespace-pre-line">{{ note.body }}</p>
           <p class="m-0 mt-1 body-sm text-subtle">
             {{ t('notes.updated', { date: d(new Date(note.updatedAt), 'short') }) }}
-            ·
-            <RouterLink :to="`/notes/${note.id}/history`" :aria-label="t('notes.historyOf', { title: note.title })">{{
-              t('notes.history.link')
-            }}</RouterLink>
           </p>
         </div>
         <BccButton

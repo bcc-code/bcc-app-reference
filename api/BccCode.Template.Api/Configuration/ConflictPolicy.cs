@@ -10,7 +10,7 @@ namespace BccCode.Template.Api.Configuration;
 /// <summary>
 /// A second writer of one row answers 409 on every transactional chain, listed in the OpenAPI document (standard 12.12).
 /// Instead of <c>MapConcurrencyFailuresToConflict</c>, whose filter runs before transactions are applied, so it would miss
-/// endpoints that are transactional only because they take a <c>Change</c> or return a storage action.
+/// endpoints that are transactional only because they return a storage action or take a <c>DbContext</c>.
 /// </summary>
 public sealed class ConflictPolicy : IHttpPolicy
 {

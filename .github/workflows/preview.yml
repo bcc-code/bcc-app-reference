@@ -288,6 +288,8 @@ jobs:
             sql "CREATE SCHEMA \"$schema\""
           fi
           jasper db-apply
+          # Created here so the owner role owns it and the teardown's DROP SCHEMA CASCADE can remove it; the mock only reads and inserts. Same DDL as PersistentKeys.
+          sql "CREATE TABLE IF NOT EXISTS \"$schema\".oidc_mock_keys (purpose text PRIMARY KEY, pem text NOT NULL)"
           sql "REASSIGN OWNED BY CURRENT_USER TO \"$DB_OWNER_ROLE\""
           jasper db-assert
           if [ "$reset" = true ]; then

@@ -1,4 +1,3 @@
-using BccCode.Template.Changes;
 using BccCode.Template.Notes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -7,8 +6,7 @@ using Npgsql;
 namespace BccCode.Template.Persistence;
 
 /// <summary>
-/// The relational store (ADR 0028): ordinary tables, one typed <c>_history</c> twin per audited table and the table of
-/// business steps. Each feature maps its tables in its own <c>IEntityTypeConfiguration</c>; this class finds them by
+/// The relational store: ordinary tables. Each feature maps its tables in its own <c>IEntityTypeConfiguration</c>; this class finds them by
 /// scanning the assembly, so a new feature adds its table without an edit here. Endpoints use it directly: no repository
 /// on top of it (standard 12).
 /// </summary>
@@ -23,21 +21,15 @@ public sealed class TemplateDb(DbContextOptions<TemplateDb> options, TemplateDbS
 
     public string? Schema { get; } = schema.Name;
 
-    public DbSet<Change> Changes => Set<Change>();
-
-    public DbSet<Actor> Actors => Set<Actor>();
-
     public DbSet<Note> Notes => Set<Note>();
 
-    public DbSet<NoteVersion> NoteVersions => Set<NoteVersion>();
-
-    // Not audited: the host's sign-in sessions and the Data Protection key ring have no history.
+    // The host's sign-in sessions and the Data Protection key ring.
     public DbSet<AuthSessionRow> AuthSessions => Set<AuthSessionRow>();
 
     public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
 
     /// <summary>
-    /// Deletes every row of every table in the model, history included, without firing triggers, except the tables of the entity
+    /// Deletes every row of every table in the model without firing triggers, except the tables of the entity
     /// types in <paramref name="keep"/>. Only the seeder's reset and the integration tests call it; they run only against
     /// disposable databases.
     /// </summary>
@@ -48,15 +40,6 @@ public sealed class TemplateDb(DbContextOptions<TemplateDb> options, TemplateDbS
 #pragma warning disable EF1002 // Table names from the model, quoted.
         await Database.ExecuteSqlRawAsync($"truncate {string.Join(", ", tables)}", cancellationToken);
 #pragma warning restore EF1002
-    }
-
-    /// <summary>The quoted, schema-qualified table of an entity, for the few statements EF cannot write.</summary>
-    public string TableOf<T>()
-    {
-        var entity = Model.FindEntityType(typeof(T)) ?? throw new InvalidOperationException($"{typeof(T).Name} is not mapped.");
-        var table = Quote(entity.GetTableName()!);
-        var tableSchema = entity.GetSchema();
-        return tableSchema is null ? table : $"{Quote(tableSchema)}.{table}";
     }
 
     private static string Quote(string identifier)
@@ -76,26 +59,6 @@ public sealed class TemplateDb(DbContextOptions<TemplateDb> options, TemplateDbS
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         if (Schema is not null) modelBuilder.HasDefaultSchema(Schema);
-
-        modelBuilder.Entity<Change>(b =>
-        {
-            b.ToTable("change");
-            b.HasKey(c => c.Id);
-            // Created in code. Not "generated", so EF inserts a new change it finds through a row's navigation.
-            b.Property(c => c.Id).ValueGeneratedNever();
-            b.Property(c => c.Type).IsRequired();
-            b.Property(c => c.Position).UseIdentityAlwaysColumn();
-            b.HasIndex(c => new { c.SubjectId, c.Position });
-            b.HasOne<Actor>().WithMany().HasForeignKey(c => c.ActorId).OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<Actor>(b =>
-        {
-            b.ToTable("actor");
-            b.HasKey(a => a.Id);
-            b.Property(a => a.Id).ValueGeneratedNever();
-            b.HasIndex(a => a.PersonUid).IsUnique();
-        });
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(TemplateDb).Assembly);
     }

@@ -6,6 +6,8 @@
     "moduleResolution": "bundler",
     "types": ["node"],
     "noEmit": true,
+    // Without `incremental`, `vue-tsc --build` keeps no per-file state and checks every file again on each run.
+    "incremental": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
   }
 }

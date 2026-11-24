@@ -21,7 +21,7 @@ The content-hashed bundles under `assets/` in the `<project>-assets` bucket are 
 
 ## When to roll forward instead
 
-The schema step (`db-apply`) runs before the rollout and is not rolled back with the traffic. Schema changes are only additive (new tables and columns, standard 06.12), so the previous revision runs against the newer schema and a traffic rollback is safe. A release that removed or renamed something in the schema, or wrote data in a shape the previous code cannot read, is rolled forward with a fix instead. The same holds for the history tables: a rename or type change is written for both the table and its `_history` twin in one migration ([ADR 0028](../adrs/0028-relational-domain-data-with-typed-history.md)), so it is not a rollback case.
+The schema step (`db-apply`) runs before the rollout and is not rolled back with the traffic. Schema changes are only additive (new tables and columns, standard 06.12), so the previous revision runs against the newer schema and a traffic rollback is safe. A release that removed or renamed something in the schema, or wrote data in a shape the previous code cannot read, is rolled forward with a fix instead.
 
 ## Infrastructure
 

@@ -6,68 +6,121 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Npgsql;
 using OidcMock;
-using Testcontainers.PostgreSql;
-using Testcontainers.Xunit;
-using Wolverine.Runtime;
-using Xunit.Sdk;
 
 namespace BccCode.Template.IntegrationTests.Infrastructure;
 
 /// <summary>
-/// One Postgres container and one API host for all integration tests. The schema is applied with db-apply before the host starts,
-/// because the host never creates it (standard 12.6). Tests share the container and start from an empty database through
-/// <see cref="ResetDataAsync"/>. Sign-in is real: <c>scenario.As(user)</c> makes a session in the session store and sends its
-/// cookie (<see cref="TestSessions"/>), so everything in the pipeline (policies, the second-factor check, the cross-origin check,
-/// headers, ProblemDetails) is the production code. Internal messages use the durable local inbox, as they do locally
-/// (<c>Messaging:UsePubSub</c> is off), and the tests run the durability pass themselves.
+/// The database and API host one test class shares across its tests. The database is a clone of the migrated template that
+/// <see cref="PostgresFixture"/> prepared once, so classes run in parallel and share nothing but the server. Tests in a class start
+/// from empty data through <see cref="ResetDataAsync"/>. Sign-in is real: <c>scenario.As(user)</c> makes a session in the session
+/// store and sends its cookie (<see cref="TestSessions"/>), so everything in the pipeline (policies, the second-factor check, the
+/// cross-origin check, headers, ProblemDetails) is the production code. Internal messages use the durable local inbox, as they do
+/// locally (<c>Messaging:UsePubSub</c> is off), and the tests run the durability pass themselves.
 /// </summary>
-public sealed class AppFixture(IMessageSink messageSink) : ContainerFixture<PostgreSqlBuilder, PostgreSqlContainer>(messageSink)
+public sealed class AppFixture(PostgresFixture postgres) : IAsyncLifetime
 {
+    private readonly string _databaseName = $"template_test_{Guid.NewGuid():N}";
     private SessionInjector _sessions = null!;
+    private string? _dirtySql;
 
     public IAlbaHost Host { get; private set; } = null!;
 
-    public string ConnectionString => Container.GetConnectionString();
+    public string ConnectionString { get; private set; } = null!;
 
-    /// <summary>A new <see cref="TemplateDb"/> on the host's database and schema (ADR 0028). Dispose it.</summary>
+    /// <summary>A new <see cref="TemplateDb"/> on the host's database and schema. Dispose it.</summary>
     public TemplateDb NewDb()
     {
         return Host.Services.GetRequiredService<IDbContextFactory<TemplateDb>>().CreateDbContext();
     }
 
-    protected override PostgreSqlBuilder Configure()
+    public async ValueTask InitializeAsync()
     {
-        return new("postgres:18");
-    }
-
-    protected override async ValueTask InitializeAsync()
-    {
-        await base.InitializeAsync();
-        // What the schema step does before the API starts in a real environment; the API itself never migrates. The tables
-        // come first because the host reads the Data Protection key ring while it starts.
-        (await SchemaCommands.RunAsync("db-apply", ConnectionString)).Should().Be(0, "db-apply creates the schema the host needs");
+        ConnectionString = await postgres.CreateDatabaseFromTemplateAsync(_databaseName);
         Host = await StartHostAsync();
         _sessions = SessionInjector.Install(Host);
     }
 
-    protected override async ValueTask DisposeAsyncCore()
+    public async ValueTask DisposeAsync()
     {
         await Host.DisposeAsync();
-        await base.DisposeAsyncCore();
+        await postgres.DropDatabaseAsync(_databaseName);
     }
 
     /// <summary>
-    /// Removes the rows of every table (notes, their history, changes, sign-in sessions) and Wolverine's inbox, outbox and dead
-    /// letters, so a test sees only what it stores itself. The Data Protection keys stay: a running host holds its key ring in
-    /// memory and does not write the keys again.
+    /// Puts the database back to the state it was cloned in: no rows in any table the tests write to (notes,
+    /// sign-in sessions, and Wolverine's inbox, outbox and dead letters), and the sequences they used restarted. The Data
+    /// Protection keys stay, because a running host holds its key ring in memory and does not write the keys again, and so do the
+    /// migration history and Wolverine's node bookkeeping, which the host depends on.
     /// </summary>
+    /// <remarks>
+    /// Only the tables that hold a row, and the sequences that handed out a value, are touched, because a truncate costs about the
+    /// same per table whether it holds rows or not. Foreign keys and triggers are off for the transaction
+    /// (<c>session_replication_role = replica</c>), so the tables can be emptied in any order.
+    /// </remarks>
     public async Task ResetDataAsync()
     {
-        await Host.Services.GetRequiredService<IWolverineRuntime>().Storage.Admin.ClearAllAsync();
-        await using var db = NewDb();
-        await db.DeleteAllDataAsync([typeof(DataProtectionKeyRow)]);
+        await using var connection = new NpgsqlConnection(ConnectionString);
+        await connection.OpenAsync();
+        _dirtySql ??= await BuildDirtySqlAsync(connection);
+
+        var statements = new List<string>();
+        await using (var query = new NpgsqlCommand(_dirtySql, connection))
+        await using (var reader = await query.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+                statements.Add(reader.GetString(0) == "table" ? $"delete from {reader.GetString(1)};" : $"alter sequence {reader.GetString(1)} restart;");
+        }
+
+        if (statements.Count > 0)
+        {
+            await using var transaction = await connection.BeginTransactionAsync();
+            await using var command = new NpgsqlCommand($"set local session_replication_role = replica; {string.Concat(statements)}", connection, transaction);
+            await command.ExecuteNonQueryAsync();
+            await transaction.CommitAsync();
+        }
+
         _sessions.Clear();
+    }
+
+    /// <summary>
+    /// A query that names every resettable table that holds a row (<c>table</c>) and every sequence one of them owns that has handed
+    /// out a value (<c>sequence</c>). Sequences are checked on their own because a test may insert into a table and delete the row
+    /// again: left alone, the next test would get other ids.
+    /// </summary>
+    private static async Task<string> BuildDirtySqlAsync(NpgsqlConnection connection)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            WITH resettable AS (
+                SELECT format('%I.%I', schemaname, tablename)::regclass AS oid
+                FROM pg_tables
+                WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+                  AND tablename NOT IN ('__ef_migrations_history', 'data_protection_keys')
+                  AND (tablename NOT LIKE 'wolverine\_%'
+                       OR tablename IN ('wolverine_incoming_envelopes', 'wolverine_outgoing_envelopes', 'wolverine_dead_letters'))
+            )
+            SELECT 'table', r.oid::regclass::text FROM resettable r
+            UNION ALL
+            SELECT 'sequence', s.oid::regclass::text
+            FROM resettable r
+            JOIN pg_depend d ON d.classid = 'pg_class'::regclass AND d.refobjid = r.oid AND d.deptype IN ('a', 'i')
+            JOIN pg_class s ON s.oid = d.objid AND s.relkind = 'S'
+            """, connection);
+
+        var checks = new List<string>();
+        await using (var reader = await command.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                var (kind, name) = (reader.GetString(0), reader.GetString(1));
+                var dirty = kind == "table" ? $"EXISTS (SELECT 1 FROM {name})" : $"(SELECT is_called FROM {name})";
+                checks.Add($"SELECT '{kind}', '{name.Replace("'", "''")}' WHERE {dirty}");
+            }
+        }
+
+        return string.Join("\nUNION ALL ", checks);
     }
 
     /// <summary>Another host on the same database, for a test that changes configuration.</summary>
@@ -124,18 +177,21 @@ public static class TestFrontend
     }
 }
 
-[CollectionDefinition(Name)]
-public sealed class AppCollectionDefinition : ICollectionFixture<AppFixture>
+/// <summary>
+/// For the tests that cannot run beside other classes because they change process-wide state (environment variables, as
+/// <see cref="SchemaCommands"/> does). xUnit runs this collection alone, after the parallel classes are done.
+/// </summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class SerialCollectionDefinition
 {
-    public const string Name = "app";
+    public const string Name = "serial";
 }
 
 /// <summary>
 /// Base class for tests on the API host. Every test starts with empty data, so no test depends on what another one stored. The
 /// persona helpers sign in as the OIDC mock's personas, whose uids the seeder writes notes for.
 /// </summary>
-[Collection(AppCollectionDefinition.Name)]
-public abstract class AppTest(AppFixture fixture) : IAsyncLifetime
+public abstract class AppTest(AppFixture fixture) : IClassFixture<AppFixture>, IAsyncLifetime
 {
     protected AppFixture Fixture => fixture;
 

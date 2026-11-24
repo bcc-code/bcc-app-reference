@@ -54,8 +54,6 @@ const backendSource = read(
 const runtimeKeys: { pattern: RegExp; builtBy: string }[] = [
   // The failed Vuelidate rule's name.
   { pattern: /^form\.alerts\.[A-Za-z0-9]+$/, builtBy: 'errorMessages in components/validation.ts' },
-  // The business step the API names in a note's history.
-  { pattern: /^notes\.history\.steps\.[A-Za-z]+$/, builtBy: 'stepLabel in notes/NoteHistoryPage.vue' },
 ]
 
 function isUsed(key: string): boolean {

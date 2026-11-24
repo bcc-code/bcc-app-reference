@@ -16,7 +16,7 @@ public static class SchemaCommands
         var entryPoint = typeof(Program).Assembly.EntryPoint ?? throw new InvalidOperationException("The API assembly has no entry point.");
         // Development: Production needs pre-generated Wolverine code. The process does not look like a JasperFx command to the
         // configuration code (the process arguments are the test runner's), so the settings it needs are given too.
-        // The settings are process-wide, which is fine because the integration tests run in one serial collection.
+        // The settings are process-wide, so the tests that call this run in the serial collection (and the assembly fixture runs before any test).
         var settings = new Dictionary<string, string?>
         {
             [$"ConnectionStrings__{EntityFrameworkConfiguration.ConnectionName}"] = connectionString,

@@ -6,7 +6,7 @@ using Npgsql;
 namespace BccCode.Template.Api.Configuration;
 
 /// <summary>
-/// Two requests that write the same row at once (ADR 0028): the second fails on EF's concurrency token, or on a unique
+/// Two requests that write the same row at once: the second fails on EF's concurrency token, or on a unique
 /// key when both insert it. Both are the conflict a stale version is: 409 (<see cref="ConflictPolicy"/>), with the i18n key
 /// <see cref="Problems.Keys.Conflict"/>. Any other failed save stays a 500.
 /// </summary>

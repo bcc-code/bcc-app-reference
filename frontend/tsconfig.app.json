@@ -8,6 +8,8 @@
     "lib": ["ES2023", "DOM"],
     "resolveJsonModule": true,
     "paths": { "@/*": ["./src/*"] },
+    // Without `incremental`, `vue-tsc --build` keeps no per-file state and checks every file again on each run.
+    "incremental": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo"
   }
 }

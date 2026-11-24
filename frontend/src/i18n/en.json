@@ -27,17 +27,6 @@
       "body": "Text",
       "create": "Create note",
       "save": "Save changes"
-    },
-    "historyOf": "History of {title}",
-    "history": {
-      "link": "History",
-      "title": "Note history",
-      "version": "Version {version}",
-      "steps": {
-        "NoteCreated": "Created",
-        "NoteEdited": "Edited",
-        "NoteArchived": "Archived"
-      }
     }
   },
   "admin": {

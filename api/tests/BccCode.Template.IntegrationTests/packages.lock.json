@@ -54,16 +54,6 @@
           "Testcontainers": "4.16.0"
         }
       },
-      "Testcontainers.XunitV3": {
-        "type": "Direct",
-        "requested": "[4.16.0, )",
-        "resolved": "4.16.0",
-        "contentHash": "eVsnhq9BrarzVp/sk4l4ketzhMTFGbPKHtAdNqDNhLxyMAq0CGxZf35FVMtWEh7e5jIx6J3QJSyi3HCBLUZ9Kw==",
-        "dependencies": {
-          "Testcontainers": "4.16.0",
-          "xunit.v3.extensibility.core": "3.2.2"
-        }
-      },
       "xunit.v3": {
         "type": "Direct",
         "requested": "[4.0.3, )",
@@ -777,11 +767,6 @@
         "resolved": "13.0.4",
         "contentHash": "pdgNNMai3zv51W5aq268sujXUyx7SNdE2bj1wZcWjAQrKMFZV260lbqYop1d2GM67JI1huLRwxo9ZqnfF/lC6A=="
       },
-      "Npgsql": {
-        "type": "Transitive",
-        "resolved": "10.0.3",
-        "contentHash": "7nb5YzXuvWWJxB0J8DiyL3we+X4FOctZrt0fIBnucOIaIevFEEwGQVZKtiu9olXdlNAK1eNgqSral6r/jlhI4w=="
-      },
       "Npgsql.DependencyInjection": {
         "type": "Transitive",
         "resolved": "10.0.3",
@@ -1302,6 +1287,12 @@
         "requested": "[3.11.0, )",
         "resolved": "3.11.0",
         "contentHash": "kvQz+mL/fnDw2VaE8zMyQhbMv7FmOYUydIhCVNKxQdrLu9XiMT/07DHwJ5YkRO2uzcxTFvMAKFKKywxoyLKHcA=="
+      },
+      "Npgsql": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.3, )",
+        "resolved": "10.0.3",
+        "contentHash": "7nb5YzXuvWWJxB0J8DiyL3we+X4FOctZrt0fIBnucOIaIevFEEwGQVZKtiu9olXdlNAK1eNgqSral6r/jlhI4w=="
       },
       "Npgsql.EntityFrameworkCore.PostgreSQL": {
         "type": "CentralTransitive",

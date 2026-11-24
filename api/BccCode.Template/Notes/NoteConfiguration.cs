@@ -1,4 +1,3 @@
-using BccCode.Template.Changes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -9,20 +8,14 @@ public sealed class NoteConfiguration : IEntityTypeConfiguration<Note>
 {
     public void Configure(EntityTypeBuilder<Note> builder)
     {
-        HistoryMapping.ConfigureAudited(builder, "note");
+        builder.ToTable("note");
+        builder.HasKey(n => n.Id);
+        builder.Property(n => n.Id).ValueGeneratedNever();   // created in code (a version 7 uuid)
+        builder.Property(n => n.Version).IsConcurrencyToken();   // a stale save fails and answers 409
         builder.Property(n => n.Title).HasMaxLength(NoteTitle.MaxLength).IsRequired();
         builder.Property(n => n.Body).HasMaxLength(NoteBody.MaxLength).IsRequired();
         // Archived notes are hidden everywhere unless a query asks for them (IgnoreQueryFilters), so a read cannot forget the rule.
-        builder.HasQueryFilter(n => n.RemovedAt == null);
-        builder.HasIndex(n => new { n.OwnerId, n.CreatedAt }).HasFilter("removed_at is null");   // the list: own, active, newest first
-    }
-}
-
-/// <summary>The twin of <see cref="NoteConfiguration"/>: <c>note_history</c>, created by <c>history_sync</c>, not by EF.</summary>
-public sealed class NoteVersionConfiguration : IEntityTypeConfiguration<NoteVersion>
-{
-    public void Configure(EntityTypeBuilder<NoteVersion> builder)
-    {
-        HistoryMapping.ConfigureHistory(builder, "note");
+        builder.HasQueryFilter(n => n.ArchivedAt == null);
+        builder.HasIndex(n => new { n.OwnerId, n.CreatedAt }).HasFilter("archived_at is null");   // the list: own, active, newest first
     }
 }

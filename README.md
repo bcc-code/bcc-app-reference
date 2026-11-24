@@ -12,7 +12,7 @@ bcc-privacy and bcc-vote. One sample app, personal notes, shows every layer end 
   default-deny authorization with an anonymous-route allowlist and a `Permission` step per endpoint, cross-origin protection instead of
   CSRF tokens, security headers and nonce CSP.
 - **Sample feature**: personal notes as vertical slices with value types, typed ProblemDetails, optimistic concurrency, ownership checks
-  (403 and 404) and a typed history table per audited table with a `change` table of business steps.
+  (403 and 404) and soft removal (archiving). An audit trail and history are not part of the template yet.
 - **Quality guards**: warnings as errors, banned APIs at compile time, central package management with lock files, architecture tests,
   endpoint policy sweep, OpenAPI and client drift checks, i18n completeness, axe in the E2E tests.
 - **CI/CD**: one `ci` check (backend, integration, E2E on the AppHost, codegen and image, contracts, frontend, infra, C4, gitleaks,
@@ -39,7 +39,7 @@ bcc-privacy and bcc-vote. One sample app, personal notes, shows every layer end 
 3. Provision the project with `provision-project.yml` and follow the [first-deploy runbook](docs/runbooks/first-deploy.md); fill in the
    project-specific values in `infra/` and the Config section of the ClickUp skills, and set the `CODEOWNERS` team.
 4. Set up the repository settings in [docs/development/repository-settings.md](docs/development/repository-settings.md).
-5. Replace the Notes sample with the first real feature (the `relational-slice` skill describes the pattern), and review
+5. Replace the Notes sample with the first real feature (`Notes/` is the pattern: an entity with `version`, one file per endpoint, a configuration class), and review
    [the data inventory](docs/data-protection/data-inventory.md).
 
 ## Prerequisites

@@ -9,7 +9,7 @@ public static class TemplateDbServices
     /// <see cref="TemplateDb"/> on the host's <see cref="NpgsqlDataSource"/>, its tables in <paramref name="schema"/>
     /// (<see cref="PersistenceSchema"/>). A factory, which also registers the scoped context the endpoints receive. The factory is
     /// what the singletons use (session storage, the key ring): they must not hold a scoped context.
-    /// The app never applies migrations; the schema step does (ADR 0028).
+    /// The app never applies migrations; the schema step does
     /// </summary>
     public static IServiceCollection AddTemplateDb(this IServiceCollection services, string schema)
     {

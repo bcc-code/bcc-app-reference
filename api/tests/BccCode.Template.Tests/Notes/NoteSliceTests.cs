@@ -1,8 +1,9 @@
-using BccCode.Template.Changes;
 using BccCode.Template.Notes;
+using BccCode.Template.Persistence;
 using BccCode.Template.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.Extensions.Time.Testing;
 
 namespace BccCode.Template.Tests.Notes;
 
@@ -18,10 +19,9 @@ public class NoteSliceTests
         return new CallerAccess(personUid, new HashSet<string>());
     }
 
-    private static Change NewChange(DateTimeOffset? at = null)
+    private static FakeTimeProvider Clock(DateTimeOffset? at = null)
     {
-        var time = at ?? Now;
-        return new Change(Guid.CreateVersion7(time), actorId: null, time);
+        return new FakeTimeProvider(at ?? Now);
     }
 
     private static NoteContent Content(string title = "T", string body = "B")
@@ -29,11 +29,11 @@ public class NoteSliceTests
         return NoteContent.Parse(title, body);
     }
 
-    /// <summary>A note at the given version: created at version 1, then edited, with a change of its own for each step, until it has moved on.</summary>
+    /// <summary>A note at the given version: created at version 1, then edited until it has moved on.</summary>
     private static Note Stored(Guid? owner = null, int version = 3)
     {
-        var note = Note.Create(Guid.CreateVersion7(), NewChange(Now.AddDays(-1)), owner ?? Owner, Content());
-        while (note.Version < version) note.Edit(NewChange(Now.AddHours(-1)), Content());
+        var note = Note.Create(Guid.CreateVersion7(), Now.AddDays(-1), owner ?? Owner, Content());
+        while (note.Version < version) note.Edit(Now.AddHours(-1), Content());
         return note;
     }
 
@@ -49,19 +49,16 @@ public class NoteSliceTests
     }
 
     [Fact]
-    public void Creating_adds_a_note_at_version_1_owned_by_the_caller_and_names_the_step()
+    public void Creating_adds_a_note_at_version_1_owned_by_the_caller()
     {
         var request = new CreateNoteRequest(" Title ", "Body");
         CreateNoteEndpoint.Validate(request).Should().BeNull();
-        var change = NewChange();
 
-        var (response, insert) = CreateNoteEndpoint.Post(request, Caller(Owner), change);
+        var (response, insert) = CreateNoteEndpoint.Post(request, Caller(Owner), Clock());
 
         var note = insert.Entity.Should().BeOfType<Note>().Subject;
         (note.Id, note.OwnerId, note.Title, note.Body, note.Version, note.CreatedAt).Should().Be((response.Value!.Id, Owner, "Title", "Body", 1, Now));
         note.Id.Version.Should().Be(7);
-        (note.ChangeId, note.Change).Should().Be((change.Id, change));
-        (change.Type, change.SubjectId).Should().Be((Note.Created, note.Id));
         response.Location.Should().Be($"/api/notes/{note.Id}");
         response.Value.Version.Should().Be(1);
     }
@@ -86,8 +83,6 @@ public class NoteSliceTests
         PermissionStatus(ArchiveNoteEndpoint.Permission(note, Caller(Stranger))).Should().Be(403);
         PermissionStatus(GetNoteEndpoint.Permission(note, Caller(Stranger))).Should().Be(403);
         PermissionStatus(GetNoteEndpoint.Permission(null, Caller(Owner))).Should().Be(404);
-        PermissionStatus(GetNoteHistoryEndpoint.Permission(note, Caller(Stranger))).Should().Be(403);
-        GetNoteHistoryEndpoint.Permission(note, Caller(Owner)).Should().BeNull();
     }
 
     [Fact]
@@ -106,12 +101,11 @@ public class NoteSliceTests
     {
         var note = Stored(version: 3);
         var request = new EditNoteRequest("New", "Body", 3);
-        var change = NewChange(Now);
 
-        var response = EditNoteEndpoint.Post(request, note, change);
+        var response = EditNoteEndpoint.Post(request, note, Clock());
 
         response.Should().Be(new EditNoteResponse(note.Id, "New", "Body", note.CreatedAt, Now, 4));
-        (note.Version, note.ChangeId, change.Type).Should().Be((4, change.Id, Note.Edited));
+        note.Version.Should().Be(4);
     }
 
     [Fact]
@@ -127,12 +121,11 @@ public class NoteSliceTests
     public void Archiving_removes_the_note_and_moves_the_version_on()
     {
         var note = Stored(version: 2);
-        var change = NewChange(Now);
 
-        var message = ArchiveNoteEndpoint.Post(new ArchiveNoteRequest(2), note, change);
+        var message = ArchiveNoteEndpoint.Post(new ArchiveNoteRequest(2), note, Clock());
 
         message.Should().Be(new NoteArchivedMessage(note.Id), "the archive slice hands the message to the outbox as a side effect");
-        (note.RemovedAt, note.Version, note.UpdatedAt, change.Type).Should().Be((Now, 3, Now, Note.Archived));
+        (note.ArchivedAt, note.Version, note.UpdatedAt).Should().Be((Now, 3, Now));
     }
 
     [Fact]
@@ -169,39 +162,23 @@ public class NoteSliceTests
     }
 
     [Fact]
-    public void One_change_cannot_be_two_steps()
+    public void The_time_a_write_stores_is_cut_to_the_microseconds_postgres_keeps()
     {
-        var note = Stored();
-        var change = NewChange();
-        note.Edit(change, Content("Once"));
+        var clock = new FakeTimeProvider(new DateTimeOffset(2026, 10, 19, 8, 0, 0, TimeSpan.Zero).AddTicks(7));
 
-        var twice = () => note.Archive(change);
-
-        twice.Should().Throw<InvalidOperationException>("the note was already changed by this change, which is also what names the step");
+        PostgresTime.Now(clock).Ticks.Should().Be(new DateTimeOffset(2026, 10, 19, 8, 0, 0, TimeSpan.Zero).Ticks);
     }
 
     [Fact]
-    public void A_change_names_one_step_one_subject_and_one_reason()
+    public void Every_edit_and_archive_moves_the_version_on_by_one()
     {
-        var change = NewChange();
-        var subject = Guid.CreateVersion7();
-        change.Name("NoteEdited", subject, "typo");
+        var note = Note.Create(Guid.CreateVersion7(), Now, Owner, Content());
+        note.Version.Should().Be(1);
 
-        change.Name("NoteEdited", subject, "typo").Should().BeSameAs(change, "naming it again the same is allowed");
-        var another = () => change.Name("NoteArchived", subject);
-        var otherSubject = () => change.Name("NoteEdited", Guid.CreateVersion7(), "typo");
-        var otherReason = () => change.Name("NoteEdited", subject, "other");
+        note.Edit(Now.AddMinutes(1), Content("Two"));
+        note.Edit(Now.AddMinutes(2), Content("Three"));
+        note.Archive(Now.AddMinutes(3));
 
-        another.Should().Throw<InvalidOperationException>();
-        otherSubject.Should().Throw<InvalidOperationException>();
-        otherReason.Should().Throw<InvalidOperationException>();
-    }
-
-    [Fact]
-    public void The_time_of_a_change_is_cut_to_the_microseconds_postgres_keeps()
-    {
-        var change = new Change(Guid.CreateVersion7(), null, new DateTimeOffset(2026, 10, 19, 8, 0, 0, TimeSpan.Zero).AddTicks(7));
-
-        change.At.Ticks.Should().Be(new DateTimeOffset(2026, 10, 19, 8, 0, 0, TimeSpan.Zero).Ticks);
+        (note.Version, note.Title, note.UpdatedAt, note.ArchivedAt).Should().Be((4, "Three", Now.AddMinutes(3), Now.AddMinutes(3)));
     }
 }

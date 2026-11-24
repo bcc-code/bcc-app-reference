@@ -6,12 +6,10 @@
     <!-- ASPIRE010: the AppHost runs through dotnet run and the aspire.cli tool manifest, not the Aspire CLI bundle. -->
     <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
   </PropertyGroup>
+  <!-- No ProjectReferences to the services: AddDotnetProject takes their paths, and Aspire builds them once when the app starts. A
+       reference here only made the AppHost build compile them first. The E2E project holds build-order-only references instead. -->
   <ItemGroup>
-    <ProjectReference Include="..\OidcMock\OidcMock.csproj" />
-    <ProjectReference Include="..\BccCode.Template.Api\BccCode.Template.Api.csproj" />
-    <ProjectReference Include="..\BccCode.Template.TestData\BccCode.Template.TestData.csproj" />
-  </ItemGroup>
-  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Dotnet" />
     <PackageReference Include="Aspire.Hosting.JavaScript" />
     <PackageReference Include="Aspire.Hosting.PostgreSQL" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.PostgreSQL.Extensions" />

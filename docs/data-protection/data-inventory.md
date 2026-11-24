@@ -9,25 +9,21 @@ The legal basis, the roles (controller, processor) and the information given to 
 ## Identifiers
 
 - **personUid** is BCC's person id from BCC Signon (the claim `https://login.bcc.no/claims/personUid`). It is pseudonymous: it does not name a person without BCC's person registry. All data is keyed by it ([ADR 0019](../adrs/0019-bff-sign-in-with-bcc-signon.md)). It is stored in the stores below and is never logged (standard 18.9).
-- **Actor alias** is the id the `change` table uses for the person who made a change. An `actor` table maps the alias to the personUid, so erasing a person clears one mapping and leaves the history rows without a name ([ADR 0028](../adrs/0028-relational-domain-data-with-typed-history.md)).
-- **Note id** and **change id** are random Guids with no personal data in them.
+- **Note id** is a random Guid with no personal data in it.
 
-The OIDC `sub` claim is kept only in the session store (section 2), for back-channel logout. It is not copied into notes or changes.
+The OIDC `sub` claim is kept only in the session store (section 2), for back-channel logout. It is not copied into notes.
 
 ## Stores
 
-### 1. Notes (`note`, `note_history`, `change` and `actor` tables)
+### 1. Notes (`note` table)
 
 - **Code:** `api/BccCode.Template/Notes/` and the storage in `api/BccCode.Template/`.
-- **Where:** tables in the environment's Postgres database (Cloud SQL, in the region of the project). `note_history` is the typed history twin of `note`, filled by the `history_track()` trigger. `change` has one row per business step. `actor` maps an actor alias to a personUid.
+- **Where:** tables in the environment's Postgres database (Cloud SQL, in the region of the project).
 - **Fields:**
-  - `note`: id, owner personUid, title and body (free text written by the user, which may contain personal data about the user or others, and which the template cannot limit), created, edited, archived and removed times, `change_id` and `version`.
-  - `note_history`: the same columns as `note` for each earlier version of a row, plus when it was replaced and by which change.
-  - `change`: id, step type (for example `NoteArchived`), actor alias, time, an optional reason, and the id of the note it was about.
-  - `actor`: alias and personUid.
+  - `note`: id, owner personUid, title and body (free text written by the user, which may contain personal data about the user or others, and which the template cannot limit), created, edited and archived times, and `version`.
 - **Purpose:** to let a signed-in person keep personal notes; in the template, to demonstrate the structure.
-- **Who can read it:** the owner only. Another person's note answers 403 and an unknown or archived one 404, both without a body ([ADR 0022](../adrs/0022-default-deny-authorization-and-request-hardening.md)): a note id is a random Guid and its existence is not personal data. Tests with two personas check that a refused write stored nothing. History and changes are not exposed through the API. Administrators get note counts only (`GET /api/admin/stats`, no identifiers). Database access is for the admin group of the shared database, through the Cloud SQL Auth Proxy.
-- **Retention:** not decided (open question 2). Archiving hides a note from the user but does not delete it. Removal is soft (`removed_at`): the app never deletes a domain row. The database does not forbid it yet (see [Anonymization and erasure](#anonymization-and-erasure)).
+- **Who can read it:** the owner only. Another person's note answers 403 and an unknown or archived one 404, both without a body ([ADR 0022](../adrs/0022-default-deny-authorization-and-request-hardening.md)): a note id is a random Guid and its existence is not personal data. Tests with two personas check that a refused write stored nothing. Administrators get note counts only (`GET /api/admin/stats`, no identifiers). Database access is for the admin group of the shared database, through the Cloud SQL Auth Proxy.
+- **Retention:** not decided (open question 2). Archiving hides a note from the user but does not delete it. Removal is soft (`archived_at`): the app never deletes a domain row. The database does not forbid it yet (see [Anonymization and erasure](#anonymization-and-erasure)).
 - **Deletion:** by an erasure job that an application adds (see [Anonymization and erasure](#anonymization-and-erasure)). The template has no scheduled purge, no erasure procedure and no erasure endpoint yet (open question 4).
 - **Special categories:** not collected by design. Free text in notes can still contain them; the user interface should tell users not to store such data in notes (open question 3).
 
@@ -36,7 +32,7 @@ The template keeps no email address, phone number or address: the API requests t
 ### 2. Sign-in sessions (session table)
 
 - **Code:** `api/BccCode.Template.Api/Auth/`, [ADR 0019](../adrs/0019-bff-sign-in-with-bcc-signon.md) and [ADR 0020](../adrs/0020-server-side-sessions-with-back-channel-logout.md).
-- **Where:** an EF Core table in Postgres, without a history twin.
+- **Where:** an EF Core table in Postgres.
 - **Fields:** a random session key (the cookie value `__Host-<app>`); the OIDC `sub`, `sid` and issuer in plain text; a Data Protection-encrypted ticket with personUid, display name, `sub`, `sid`, issuer and roles; the expiry time.
 - **Purpose:** keeping the user signed in (BFF cookie session), and ending sessions on back-channel logout.
 - **Who can read it:** only the app; the ticket is encrypted with keys protected by Cloud KMS.
@@ -75,12 +71,11 @@ The template keeps no email address, phone number or address: the API requests t
 
 ## Anonymization and erasure
 
-The design erases rather than anonymizes: a note that has reached the end of its retention is deleted with its history and its changes ([ADR 0028](../adrs/0028-relational-domain-data-with-typed-history.md)). **The template implements none of the steps below yet**; an application builds them with its first retention rule (open questions 2 and 4), and the `history_track()` trigger already accepts a delete (the history row then has no replacing change).
+The design erases rather than anonymizes: a note that has reached the end of its retention is deleted. **The template implements none of the steps below yet**; an application builds them with its first retention rule (open questions 2 and 4). The template keeps no history or audit trail of notes ([tech debt](../tech-debt/audit-history-not-in-the-template.md)); an application that adds one decides how erasure reaches it.
 
-- The app's database role should not be able to delete domain rows. Today it can: the template only never issues a delete. A business removal is soft (`removed_at`, hidden by an EF query filter).
-- Erasure is a scheduled job (Cloud Scheduler calling an `/internal/` endpoint) that runs a stored procedure. The procedure deletes the object's rows, their `_history` rows and the `change` rows about them in one transaction, so nothing is left that carries the note's text.
-- Erasing a person clears the personUid behind their actor alias in the `actor` table (`Actor.PersonUid` is nullable for this). The aliases on history rows then name nobody.
-- A test per audited table should check that the erased data is gone from the table, its history and the changes, and that other people's data is untouched.
+- The app's database role should not be able to delete domain rows. Today it can: the template only never issues a delete. A business removal is soft (`archived_at`, hidden by an EF query filter).
+- Erasure is a scheduled job (Cloud Scheduler calling an `/internal/` endpoint) that runs a stored procedure. The procedure deletes the object's rows in one transaction, so nothing is left that carries the note's text.
+- A test per table should check that the erased data is gone and that other people's data is untouched.
 
 **Not reached:** sessions (8 hours); in-flight messages and dead letters (7 days); logs and traces (platform retention); backups (Cloud SQL backup retention, open question 6).
 
@@ -94,4 +89,3 @@ For the privacy team.
 4. **Erasure on request.** Who triggers erasure for one person's notes (an admin action, a self-service request or an operator task), and how a request is verified.
 5. **Logs and traces.** The retention of the platform's Cloud Logging buckets and of the metrics in bcc-monitoring, and who can read traces in the central monitoring project, where they hold the Signon `sid` of signed-in users.
 6. **Backups.** Cloud SQL backup retention and its relation to deletion requests.
-7. **History visibility.** Whether a person may see the history of their own notes, and the read log (see bcc-ateam's relational specs).

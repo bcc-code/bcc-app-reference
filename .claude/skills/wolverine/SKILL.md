@@ -10,7 +10,7 @@ Every rule below comes from one of these sources, cited by section:
 - **[BP]** Wolverine docs, [Best Practices](https://wolverinefx.io/introduction/best-practices)
 - **[REV]** Jeremy Miller, [Wolverine Best Practices, Revisited](https://jasperfx.net/news/wolverine-best-practices-2026.html) (2026-10-28)
 
-**In this repo** notes say how a rule applies under our architecture: Cloud Run with no background work, `ServerlessWithOutbox`, EF Core on Postgres and Pub/Sub push (ADRs 0013, 0023, 0024, 0028). They add no rules of their own. The relational persistence design is in the `relational-slice` skill.
+**In this repo** notes say how a rule applies under our architecture: Cloud Run with no background work, `ServerlessWithOutbox`, EF Core on Postgres and Pub/Sub push (ADRs 0013, 0023, 0024). They add no rules of their own.
 
 ## Shape of a slice
 
@@ -26,7 +26,7 @@ Every rule below comes from one of these sources, cited by section:
 - Publish only from the root handler method: return cascading messages (`null` for none), or take `IMessageBus` as a method argument. No service → service → `PublishAsync` chains. [BP, Make All Side Effects Apparent from the Root Handler]
 - Don't call `IMessageBus.InvokeAsync()` from inside a handler to reuse logic. It hides a nested transaction. [BP, same section]
 - Prefer asynchronous cascading workflows over request/reply. [BP, Prefer Purely Asynchronous Processing]
-- **In this repo:** a cascaded message is stored in the outbox with the EF Core transaction and sent after the commit, inside the request or by the next durability pass. `UseEntityFrameworkCoreTransactions(TransactionMiddlewareMode.Eager)` opens the transaction before the endpoint runs, so the rows, their history and the outbox row commit together (ADR 0028); a read that takes the `DbContext` is marked `[NonTransactional]`. There is no event stream to forward: the endpoint that records a business step returns the message (`NoteArchivedMessage` from the archive slice).
+- **In this repo:** a cascaded message is stored in the outbox with the EF Core transaction and sent after the commit, inside the request or by the next durability pass. `UseEntityFrameworkCoreTransactions(TransactionMiddlewareMode.Eager)` opens the transaction before the endpoint runs, so the rows and the outbox row commit together; a read that takes the `DbContext` is marked `[NonTransactional]`. There is no event stream to forward: the endpoint that archives a note returns the message (`NoteArchivedMessage` from the archive slice).
 
 ## Validation and HTTP
 

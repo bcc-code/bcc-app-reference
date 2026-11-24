@@ -4,7 +4,6 @@ using BccCode.Template.TestData;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Time.Testing;
 using OidcMock;
 
 namespace BccCode.Template.IntegrationTests.TestData;
@@ -15,25 +14,20 @@ public class SeederTests(AppFixture fixture) : AppTest(fixture)
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task Seeding_adds_the_notes_once_and_the_archived_one_has_a_history()
+    public async Task Seeding_adds_the_notes_once_and_the_archived_one_is_hidden()
     {
         var owner = Guid.NewGuid();
-        var time = new FakeTimeProvider();
 
         await using var db = Fixture.NewDb();
-        var first = await SeedNotes.RunAsync(db, owner, time, Ct);
+        var first = await SeedNotes.RunAsync(db, owner, Ct);
         await using var again = Fixture.NewDb();
-        var second = await SeedNotes.RunAsync(again, owner, time, Ct);
+        var second = await SeedNotes.RunAsync(again, owner, Ct);
 
         first.Should().Be(3);
         second.Should().Be(0, "the seed ids are fixed, and the archived note is found although the query filter hides it");
         await using var read = Fixture.NewDb();
-        (await read.Notes.IgnoreQueryFilters().CountAsync(n => n.OwnerId == owner && n.RemovedAt != null, Ct)).Should().Be(1);
+        (await read.Notes.IgnoreQueryFilters().CountAsync(n => n.OwnerId == owner && n.ArchivedAt != null, Ct)).Should().Be(1);
         (await read.Notes.CountAsync(n => n.OwnerId == owner, Ct)).Should().Be(2, "the archived note is hidden");
-        var retired = await read.Notes.IgnoreQueryFilters().SingleAsync(n => n.OwnerId == owner && n.RemovedAt != null, Ct);
-        (await read.NoteVersions.CountAsync(v => v.Id == retired.Id, Ct)).Should().Be(1, "creating and then archiving it replaced version 1");
-        (await read.Changes.Where(c => c.SubjectId == retired.Id).OrderBy(c => c.Position).Select(c => c.Type).ToListAsync(Ct))
-            .Should().Equal(Note.Created, Note.Archived);
     }
 
     [Fact]
@@ -67,7 +61,7 @@ public class SeederTests(AppFixture fixture) : AppTest(fixture)
     public async Task The_seeded_notes_are_what_the_user_persona_sees_through_the_api()
     {
         await using var db = Fixture.NewDb();
-        await SeedNotes.RunAsync(db, SeedNotes.Owner, TimeProvider.System, Ct);
+        await SeedNotes.RunAsync(db, SeedNotes.Owner, Ct);
 
         var result = await AsUser(s => s.Get.Url("/api/notes"));
 
@@ -104,11 +98,18 @@ public class SeedingGateTests
     [Fact]
     public void The_seed_plan_has_three_notes_and_one_of_them_is_archived()
     {
-        var plan = SeedNotes.Plan(new DateTimeOffset(2026, 10, 19, 0, 0, 0, TimeSpan.Zero));
+        var plan = SeedNotes.Plan();
 
         plan.Should().HaveCount(3);
         plan.Count(n => n.ArchivedAt is not null).Should().Be(1);
         plan.Select(n => n.Id).Should().OnlyHaveUniqueItems();
+    }
+
+    [Fact]
+    public void The_seed_plan_is_the_same_every_time_so_the_snapshot_is_reproducible()
+    {
+        SeedNotes.Plan().Should().Equal(SeedNotes.Plan());
+        SeedNotes.Plan().Select(n => n.CreatedAt.Offset).Should().OnlyContain(o => o == TimeSpan.Zero);
     }
 
     [Fact]

@@ -9,5 +9,18 @@
       "WebFetch(domain:wolverinefx.net)",
       "WebFetch(domain:aspire.dev)"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/tools/worktree-cleanup/prune-volumes.mjs\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
   }
 }

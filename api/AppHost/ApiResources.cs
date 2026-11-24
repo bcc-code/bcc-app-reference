@@ -1,3 +1,4 @@
+using Aspire.Hosting.Dotnet;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -5,10 +6,10 @@ using Microsoft.Extensions.Logging;
 internal static class ApiResources
 {
     /// <summary>The API, started once the schema is applied and the test data is seeded.</summary>
-    public static IResourceBuilder<ProjectResource> AddApi(this IDistributedApplicationBuilder builder, RunMode run,
-        IResourceBuilder<PostgresDatabaseResource> database, IResourceBuilder<ProjectResource> schema, IResourceBuilder<ProjectResource> testdata)
+    public static IResourceBuilder<DotnetProjectResource> AddApi(this IDistributedApplicationBuilder builder, RunMode run,
+        IResourceBuilder<PostgresDatabaseResource> database, IResourceBuilder<DotnetProjectResource> schema, IResourceBuilder<DotnetProjectResource> testdata)
     {
-        var api = builder.AddTemplateProject<Projects.BccCode_Template_Api>("api")
+        var api = builder.AddTemplateProject("api", "../BccCode.Template.Api/BccCode.Template.Api.csproj")
             .WithHttpsEndpoint(port: run.Port(LocalPorts.Api), name: "https")
             .WithHttpHealthEndpoint()
             .WithReference(database)
@@ -17,7 +18,7 @@ internal static class ApiResources
         return api.WithUrls(context =>
         {
             var endpoint = api.GetEndpoint("https");
-            context.Urls.Add(new ResourceUrlAnnotation { Url = $"https://template.dev.localhost:{endpoint.Port}", DisplayText = "Template" });
+            context.Urls.Add(new ResourceUrlAnnotation { Url = $"https://{run.BrowserHost}:{endpoint.Port}", DisplayText = "Template" });
         });
     }
 
@@ -25,15 +26,15 @@ internal static class ApiResources
     /// The address the browser uses: the <c>*.dev.localhost</c> name (standard 02) needs no hosts-file entry and gives the app its
     /// own cookie scope.
     /// </summary>
-    public static ReferenceExpression BrowserUrl(this IResourceBuilder<ProjectResource> api)
+    public static ReferenceExpression BrowserUrl(this IResourceBuilder<DotnetProjectResource> api, RunMode run)
     {
         var https = api.GetEndpoint("https");
-        return ReferenceExpression.Create($"https://template.dev.localhost:{https.Property(EndpointProperty.Port)}");
+        return ReferenceExpression.Create($"https://{run.BrowserHost}:{https.Property(EndpointProperty.Port)}");
     }
 
     /// <summary>Signs in against the OIDC mock, which the API waits for.</summary>
-    public static IResourceBuilder<ProjectResource> WithOidcMock(this IResourceBuilder<ProjectResource> api,
-        IResourceBuilder<ProjectResource> oidc, RunMode run)
+    public static IResourceBuilder<DotnetProjectResource> WithOidcMock(this IResourceBuilder<DotnetProjectResource> api,
+        IResourceBuilder<DotnetProjectResource> oidc, RunMode run)
     {
         // The API's server-side metadata calls use http under E2E: CI runners do not trust the dev certificate.
         return api.WithEnvironment("Oidc__Authority", oidc.GetEndpoint(run.IsE2E ? "http" : "https"))
@@ -46,7 +47,7 @@ internal static class ApiResources
     /// durability pass every minute; here a loop calls it every few seconds, so a message cascaded by an endpoint is handled at
     /// once, and a dashboard command runs one pass on demand.
     /// </summary>
-    public static IResourceBuilder<ProjectResource> WithLocalMessaging(this IResourceBuilder<ProjectResource> api)
+    public static IResourceBuilder<DotnetProjectResource> WithLocalMessaging(this IResourceBuilder<DotnetProjectResource> api)
     {
         api.ApplicationBuilder.Services.AddHostedService(sp => new DurabilityPassLoop(api.GetEndpoint("http"),
             sp.GetRequiredService<ResourceNotificationService>(), sp.GetRequiredService<ILogger<DurabilityPassLoop>>()));

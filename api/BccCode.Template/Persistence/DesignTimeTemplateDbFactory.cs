@@ -5,7 +5,7 @@ namespace BccCode.Template.Persistence;
 
 /// <summary>
 /// The model <c>dotnet ef migrations add</c> and <c>has-pending-model-changes</c> compare against: no schema, as the
-/// migrations are applied with <c>search_path</c> set (ADR 0028). It never connects.
+/// migrations are applied with <c>search_path</c> set. It never connects.
 /// </summary>
 public sealed class DesignTimeTemplateDbFactory : IDesignTimeDbContextFactory<TemplateDb>
 {

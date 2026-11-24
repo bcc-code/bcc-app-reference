@@ -14,7 +14,7 @@ The BCC standards describe a default stack and layout, and the existing BCC apps
 We will use the BCC default stack and layout:
 
 - **Backend:** .NET 11 and ASP.NET Core under `api/`, with the namespace prefix `BccCode.Template` (renamed by `scripts/init-app.ps1`). Projects: `BccCode.Template.Api` (host and composition root only, see [0025](0025-one-feature-project-with-a-host-only-api.md)), `BccCode.Template` (all feature slices and persistence), `BccCode.Template.TestData` (the seeder), `OidcMock`, `ServiceDefaults`, `AppHost`, and the test projects `BccCode.Template.Tests`, `BccCode.Template.IntegrationTests`, `BccCode.Template.E2eTests` and `BccCode.Template.ArchitectureTests` under `api/tests/`.
-- **Persistence:** one EF Core app on Postgres ([0028](0028-relational-domain-data-with-typed-history.md)). The template has no second variant.
+- **Persistence:** one EF Core app on Postgres (EF Core, the migrations and the schema step are in [0016](0016-schema-applied-by-a-deploy-step.md)). The template has no second variant.
 - **Frontend:** Vue 3, TypeScript (strict) and Vite under `frontend/`, using the BCC component library, Tailwind 4, TanStack Query, vue-router and vue-i18n. pnpm with an exact version pin and the supply-chain settings from the standards.
 - **Build:** one `BccCode.Template.slnx` with solution folders, central package management with transitive pinning, NuGet lock files, warnings as errors and nullable enabled for every project, and a pinned SDK in `global.json`.
 

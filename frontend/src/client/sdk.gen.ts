@@ -11,9 +11,6 @@ import type {
   GetApiMeResponses,
   GetApiNotesByNoteIdData,
   GetApiNotesByNoteIdErrors,
-  GetApiNotesByNoteIdHistoryData,
-  GetApiNotesByNoteIdHistoryErrors,
-  GetApiNotesByNoteIdHistoryResponses,
   GetApiNotesByNoteIdResponses,
   GetApiNotesData,
   GetApiNotesErrors,
@@ -158,20 +155,6 @@ export class NotesClient {
         'Content-Type': 'application/json',
         ...options.headers,
       },
-    })
-  }
-
-  /**
-   * GET_api_notes_noteId_history
-   *
-   * getNoteHistory
-   */
-  public static getNoteHistory<ThrowOnError extends boolean = true>(
-    options: Options<GetApiNotesByNoteIdHistoryData, ThrowOnError>,
-  ): RequestResult<GetApiNotesByNoteIdHistoryResponses, GetApiNotesByNoteIdHistoryErrors, ThrowOnError> {
-    return (options.client ?? client).get<GetApiNotesByNoteIdHistoryResponses, GetApiNotesByNoteIdHistoryErrors, ThrowOnError>({
-      url: '/api/notes/{noteId}/history',
-      ...options,
     })
   }
 }

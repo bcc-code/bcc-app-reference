@@ -15,7 +15,7 @@ public static class GetStatsEndpoint
     {
         // The archived notes are the ones the query filter hides, so the count asks for them explicitly.
         var notes = db.Notes.IgnoreQueryFilters();
-        return new(await notes.CountAsync(n => n.RemovedAt == null, ct), await notes.CountAsync(n => n.RemovedAt != null, ct));
+        return new(await notes.CountAsync(n => n.ArchivedAt == null, ct), await notes.CountAsync(n => n.ArchivedAt != null, ct));
     }
 
     [WolverineGet("/api/admin/stats")]

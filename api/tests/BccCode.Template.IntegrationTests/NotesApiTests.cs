@@ -96,7 +96,6 @@ public class NotesApiTests(AppFixture fixture) : AppTest(fixture)
 
         (await foreign.ReadAsTextAsync()).Should().BeEmpty("a 403 says all there is in its status (standard 09.10)");
         (await missing.ReadAsTextAsync()).Should().BeEmpty();
-        await Host.Scenario(s => { s.As(stranger); s.Get.Url($"/api/notes/{note.Id}/history"); s.StatusCodeShouldBe(403); });
     }
 
     [Fact]
@@ -212,8 +211,6 @@ public class NotesApiTests(AppFixture fixture) : AppTest(fixture)
         await using var db = Fixture.NewDb();
         var before = await db.Notes.AsNoTracking().SingleAsync(n => n.Id == note.Id, TestContext.Current.CancellationToken);
         var notesBefore = await db.Notes.CountAsync(TestContext.Current.CancellationToken);
-        var changesBefore = await db.Changes.CountAsync(TestContext.Current.CancellationToken);
-        var actorsBefore = await db.Actors.CountAsync(TestContext.Current.CancellationToken);
 
         foreach (var (id, status) in new[] { (note.Id, 403), (unknown, 404) })
         {
@@ -224,11 +221,8 @@ public class NotesApiTests(AppFixture fixture) : AppTest(fixture)
         }
 
         var after = await db.Notes.AsNoTracking().SingleAsync(n => n.Id == note.Id, TestContext.Current.CancellationToken);
-        (after.Version, after.Title, after.UpdatedAt, after.ChangeId).Should().Be((before.Version, before.Title, before.UpdatedAt, before.ChangeId));
+        (after.Version, after.Title, after.UpdatedAt).Should().Be((before.Version, before.Title, before.UpdatedAt));
         (await db.Notes.CountAsync(TestContext.Current.CancellationToken)).Should().Be(notesBefore);
-        (await db.Changes.CountAsync(TestContext.Current.CancellationToken)).Should().Be(changesBefore, "a refused request stores no change");
-        (await db.Actors.CountAsync(TestContext.Current.CancellationToken)).Should().Be(actorsBefore, "a first-time caller who is refused is not recorded as an actor");
-        (await db.NoteVersions.AnyAsync(v => v.Id == note.Id, TestContext.Current.CancellationToken)).Should().BeFalse();
         (await db.Notes.AnyAsync(n => n.Id == unknown, TestContext.Current.CancellationToken)).Should().BeFalse();
         var read = await Host.Scenario(s => { s.As(owner); s.Get.Url($"/api/notes/{note.Id}"); });
         (await read.ReadAsJsonAsync<GetNoteResponse>())!.Title.Should().Be("Untouched");
@@ -267,7 +261,7 @@ public class NotesApiTests(AppFixture fixture) : AppTest(fixture)
 
 /// <summary>
 /// Replaces the version of one note through its own connection right before EF's update of that note runs: another writer's
-/// change, with its own change row, as the trigger requires.
+/// change.
 /// </summary>
 internal sealed class RacingWriter(string connectionString) : SaveChangesInterceptor
 {
@@ -290,12 +284,10 @@ internal sealed class RacingWriter(string connectionString) : SaveChangesInterce
             await connection.OpenAsync(cancellationToken);
             await using var command = new NpgsqlCommand(
                 """
-                insert into change (id, type, at, subject_id) values (@change, 'NoteEdited', now(), @id);
-                update note set version = version + 1, change_id = @change where id = @id;
+                update note set version = version + 1 where id = @id;
                 """,
                 connection);
             command.Parameters.AddWithValue("id", id);
-            command.Parameters.AddWithValue("change", Guid.CreateVersion7());
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
 

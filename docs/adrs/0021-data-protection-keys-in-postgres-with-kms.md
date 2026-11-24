@@ -3,7 +3,7 @@
 - Status: Proposed
 - Date: 2026-11-13
 - Drafted with AI assistance; a person must review it before it is accepted.
-- Adapted from bcc-ateam ADR 0023, with the key ring in an EF Core table ([0028](0028-relational-domain-data-with-typed-history.md)).
+- Adapted from bcc-ateam ADR 0023, with the key ring in an EF Core table.
 
 ## Context
 
@@ -17,7 +17,7 @@ We will store the Data Protection key ring in a table in our own Postgres databa
 - Terraform creates the key ring and a crypto key with 90-day rotation and `prevent_destroy`. Only the API's runtime account may encrypt and decrypt with it.
 - `Gcp:DataProtectionKmsKeyName` is required outside Development and Test. Locally and in tests the keys are stored unencrypted in the throwaway database.
 - The application name is the app's slug, so another app on the shared instance cannot read the keys even with access to the table.
-- The key table has no history twin. Keys are not personal data, but they decrypt session tickets, so the table is in the data inventory.
+- Keys are not personal data, but they decrypt session tickets, so the table is in the data inventory.
 
 ## Consequences
 

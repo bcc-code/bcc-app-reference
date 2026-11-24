@@ -12,7 +12,7 @@ With a database, query behaviour, the schema step and the host's wiring cannot b
 ## Decision
 
 - **Unit tests** stay in `api/tests/BccCode.Template.Tests`, without Docker.
-- **Integration tests** go in `api/tests/BccCode.Template.IntegrationTests`: xUnit v3, Alba and Testcontainers Postgres. The fixture applies the schema as `db-apply` does, signs in through real cookie sessions in the session store (`AsUser`, `As(personUid)`), and each test starts from empty data. Messaging uses Wolverine's local inbox, so no Pub/Sub emulator is needed ([0023](0023-pubsub-for-internal-messages-and-bcc-pubsub-for-events.md)). Push bodies are posted to the receivers, so the push path is tested too.
+- **Integration tests** go in `api/tests/BccCode.Template.IntegrationTests`: xUnit v3, Alba and Testcontainers Postgres. One Postgres container per run (tmpfs, `fsync=off`) holds a template database that `db-apply` migrated once; each test class clones it and starts its own Alba host, so classes run in parallel, and only tests that change process-wide state share a serial collection (see [tests](../development/tests.md)). The tests sign in through real cookie sessions in the session store (`AsUser`, `As(personUid)`), and each test starts from empty data. Messaging uses Wolverine's local inbox, so no Pub/Sub emulator is needed ([0023](0023-pubsub-for-internal-messages-and-bcc-pubsub-for-events.md)). Push bodies are posted to the receivers, so the push path is tested too.
 - **E2E tests** go in `api/tests/BccCode.Template.E2eTests`: xUnit v3, .NET Playwright and `Aspire.Hosting.Testing`. The harness starts the AppHost with `E2E=true` (built `frontend/dist`) and waits for the schema step, the seeder's health check (healthy only after the seed has committed) and the API's health check before the first test. Each main state gets an axe WCAG 2.1 A/AA and 2.2 AA check. CI uploads traces and screenshots when a test fails.
 - **Architecture tests** in `api/tests/BccCode.Template.ArchitectureTests` check the slice shape, the message markers, the layering and that no code runs between requests. Forbidden APIs (the clock, local queues) are build errors through `BannedSymbols.txt`.
 - The CI workflow runs them as separate jobs, required through the aggregate `ci` job.
@@ -28,4 +28,4 @@ With a database, query behaviour, the schema step and the host's wiring cannot b
 ## Alternatives considered
 
 - **`@playwright/test` in `frontend/e2e`** — closer to the Vue code, but it cannot wait on Aspire resource health directly.
-- **EF Core InMemory or a mocked session** — forbidden for query behaviour by standards 12.15 and 19.2. The history triggers exist only in Postgres.
+- **EF Core InMemory or a mocked session** — forbidden for query behaviour by standards 12.15 and 19.2. Postgres behaviour such as the concurrency token's `WHERE` clause and unique keys is only checked on the real database.

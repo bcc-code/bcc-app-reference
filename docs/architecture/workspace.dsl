@@ -11,7 +11,7 @@ workspace "Template application" "C4 model of the BCC application template (the 
             bccPubSub = softwareSystem "BCC PubSub" "Event bus for integration events. The sample sends none." "External"
         }
 
-        app = softwareSystem "Template application" "Personal notes with history. The sample an application is made from." {
+        app = softwareSystem "Template application" "Personal notes. The sample an application is made from." {
             frontend = container "Frontend" "Single-page app. index.html comes from the API; the hashed /assets come from a bucket behind Cloud CDN." "Vue 3, TypeScript" "Web Browser"
             api = container "API" "Serves the API under /api and the SPA's index.html. Signs users in as a BFF with server-side sessions." ".NET 11, Wolverine.HTTP, EF Core" {
                 notes = component "Notes" "Create, edit and archive a person's notes. A note the caller cannot see answers 404."
@@ -19,7 +19,7 @@ workspace "Template application" "C4 model of the BCC application template (the 
                 adminStats = component "Admin" "Note counts for administrators."
             }
             messages = container "Message topic" "Internal messages between the API's own handlers, pushed back to the API. Locally the durable inbox does this." "Google Pub/Sub" "Queue"
-            database = container "Database" "Notes with typed history, changes, sessions, Data Protection keys, and Wolverine's outbox, inbox and dead letters." "PostgreSQL" "Database"
+            database = container "Database" "Notes, sessions, Data Protection keys, and Wolverine's outbox, inbox and dead letters." "PostgreSQL" "Database"
         }
 
         user -> app.frontend "Uses" "HTTPS"
@@ -34,7 +34,7 @@ workspace "Template application" "C4 model of the BCC application template (the 
         app.messages -> app.api "Pushes messages to /internal/pubsub" "HTTPS, Google OIDC"
         app.api -> bccPubSub "Publishes integration events (optional)" "HTTPS, client credentials"
 
-        app.api.notes -> app.database "Stores notes, their history and changes"
+        app.api.notes -> app.database "Stores notes"
         app.api.adminStats -> app.database "Counts notes"
 
         local = deploymentEnvironment "Local" {

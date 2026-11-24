@@ -7,7 +7,7 @@
 
 ## Context
 
-An earlier version of the template had one project per persistence variant, each with its own host, plus a shared `BccCode.Template.Web` project for HTTP plumbing. With one persistence stack ([0028](0028-relational-domain-data-with-typed-history.md)), the split has no reason left. `BccCode.Template` should be the feature project, but code that only the host uses (sign-in sessions, Data Protection keys, security headers, the Pub/Sub receivers) is not feature code.
+An earlier version of the template had one project per persistence variant, each with its own host, plus a shared `BccCode.Template.Web` project for HTTP plumbing. With one persistence stack, the split has no reason left. `BccCode.Template` should be the feature project, but code that only the host uses (sign-in sessions, Data Protection keys, security headers, the Pub/Sub receivers) is not feature code.
 
 Constraints: standard 01.2 keeps one project for all slices and allows another project only for a separate deployable or a hard dependency boundary. Standards 01.3 and 10.3 say everything a feature needs lives in its folder, not in layer projects. Wolverine finds handlers and endpoints in the assembly the host names, and `codegen write` pre-generates them ([0012](0012-pre-generated-wolverine-code-in-production.md)). One storage registration is shared by the host, `db-apply` and the seeder (standard 12.7).
 

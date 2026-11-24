@@ -1,22 +1,59 @@
-using Microsoft.Extensions.Configuration;
-
 /// <summary>
-/// How this AppHost runs. Fixed ports and a persistent database belong to the sole default instance only: parallel worktrees
-/// (<c>--isolated</c>) and E2E runs would otherwise fight over the ports and share one database.
+/// How this AppHost runs. Fixed ports and a persistent database container belong to the sole default instance only: parallel
+/// worktrees (<c>--isolated</c>) and E2E runs would otherwise fight over the ports and share one database.
 /// </summary>
-internal sealed record RunMode(bool IsE2E, bool IsSoleInstance)
+/// <param name="IsE2E">An E2E run: the lean topology on a throwaway database, browsed on plain localhost.</param>
+/// <param name="IsIsolated">An <c>--isolated</c> run that is not an E2E run: random ports and a database volume of its own.</param>
+/// <param name="InstanceSlug">The checkout folder's name as a slug for an isolated run; empty for every other run.</param>
+internal sealed record RunMode(bool IsE2E, bool IsIsolated, string InstanceSlug)
 {
-    public static RunMode From(IConfiguration configuration)
+    public bool IsSoleInstance => !IsE2E && !IsIsolated;
+
+    /// <summary>
+    /// The Docker volume of an isolated run's Postgres, or null when the run keeps no data. <c>tools/worktree-cleanup/prune-volumes.mjs</c>
+    /// removes it once the worktree is gone and relies on this name.
+    /// </summary>
+    public string? DatabaseVolumeName => IsIsolated ? $"bcc-template-{InstanceSlug}-postgres" : null;
+
+    /// <summary>
+    /// The host name the browser uses. Cookies are scoped by host and ignore ports, so instances that all browsed
+    /// <c>template.dev.localhost</c> would share the API's <c>__Host-</c> session cookie and sign each other out; each isolated run
+    /// gets a host of its own. Browsers resolve <c>*.localhost</c> themselves and the dev certificate covers <c>*.dev.localhost</c>
+    /// (one label, so a sibling name and not a subdomain). E2E runs use plain localhost: their browser contexts are fresh.
+    /// </summary>
+    public string BrowserHost => IsE2E ? "localhost" : IsIsolated ? $"template-{InstanceSlug}.dev.localhost" : "template.dev.localhost";
+
+    /// <summary>
+    /// Suffix for the OIDC mock's session cookie. The mock is always reached on localhost (the API's server-side calls cannot
+    /// resolve <c>*.dev.localhost</c>), so instances are kept apart by cookie name instead. Empty for the sole instance.
+    /// </summary>
+    public string CookieSuffix => InstanceSlug;
+
+    public static RunMode From(IDistributedApplicationBuilder builder)
     {
-        var isE2E = configuration["E2E"] == "true";
-        var isIsolated = bool.TryParse(configuration["DcpPublisher:RandomizePorts"], out var randomizePorts) && randomizePorts;
-        return new RunMode(isE2E, IsSoleInstance: !isE2E && !isIsolated);
+        var isE2E = builder.Configuration["E2E"] == "true";
+        var randomizePorts = bool.TryParse(builder.Configuration["DcpPublisher:RandomizePorts"], out var randomized) && randomized;
+        var isIsolated = !isE2E && randomizePorts;
+        return new RunMode(isE2E, isIsolated, isIsolated ? SlugOfCheckout(builder.AppHostDirectory) : "");
     }
 
     /// <summary>The fixed port for the sole instance; null (a random port) for every other run.</summary>
     public int? Port(int port)
     {
         return IsSoleInstance ? port : null;
+    }
+
+    /// <summary>
+    /// The checkout folder (the AppHost is in <c>api/AppHost</c>) as a slug: lower case, anything but an ASCII letter or digit
+    /// becomes a hyphen, trimmed, at most 40 characters. <c>prune-volumes.mjs</c> uses the same rules.
+    /// </summary>
+    private static string SlugOfCheckout(string appHostDirectory)
+    {
+        var checkout = new DirectoryInfo(appHostDirectory).Parent?.Parent?.Name ?? "";
+        var slug = new string(checkout.ToLowerInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '-').ToArray()).Trim('-');
+        if (slug.Length > 40)
+            slug = slug[..40].TrimEnd('-');
+        return slug.Length > 0 ? slug : "isolated";
     }
 }
 

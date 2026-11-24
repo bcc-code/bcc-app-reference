@@ -18,6 +18,13 @@
   <ItemGroup>
     <ProjectReference Include="..\..\AppHost\AppHost.csproj" IsAspireProjectResource="false" />
   </ItemGroup>
+  <!-- Build order only: the AppHost does not reference the services (it starts them by path), so without these the first test would
+       wait for Aspire to compile them. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\BccCode.Template.Api\BccCode.Template.Api.csproj" IsAspireProjectResource="false" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\BccCode.Template.TestData\BccCode.Template.TestData.csproj" IsAspireProjectResource="false" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\..\OidcMock\OidcMock.csproj" IsAspireProjectResource="false" ReferenceOutputAssembly="false" />
+  </ItemGroup>
   <!-- The personas are compiled in from the mock instead of referencing it: its OpenIddict packages would pull vulnerable
        transitive versions into a project that is not an ASP.NET Core app. -->
   <ItemGroup>

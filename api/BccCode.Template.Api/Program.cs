@@ -27,7 +27,7 @@ app.AssertTemplateRoutes();
 // else serves requests.
 if (CodeGeneration.IsJasperFxCommand(args))
 {
-    // db-apply and db-assert cover the EF Core migrations first (ADR 0028), then Wolverine's tables.
+    // db-apply and db-assert cover the EF Core migrations first, then Wolverine's tables.
     var migrations = args.Length > 1 ? await TemplateMigrations.RunAsync(app, args[1]) : 0;
     return migrations != 0 ? migrations : await app.RunJasperFxCommands(args[1..]);
 }

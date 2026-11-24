@@ -19,11 +19,6 @@ export const notesQueries = {
       queryKey: [...notesQueries.all(), 'detail', noteId],
       queryFn: async ({ signal }) => (await NotesClient.getNote({ path: { noteId }, signal })).data,
     }),
-  history: (noteId: string) =>
-    queryOptions({
-      queryKey: [...notesQueries.all(), 'history', noteId],
-      queryFn: async ({ signal }) => (await NotesClient.getNoteHistory({ path: { noteId }, signal })).data.entries,
-    }),
 }
 
 export function useCreateNote() {
@@ -42,11 +37,7 @@ export function useEditNote(noteId: string) {
       (await NotesClient.editNote({ path: { noteId }, body: input })).data,
     onSuccess: (note: EditNoteResponse) => {
       queryClient.setQueryData(notesQueries.detail(noteId).queryKey, note)
-      // The history has a new entry too.
-      return Promise.all([
-        queryClient.invalidateQueries({ queryKey: notesQueries.list().queryKey }),
-        queryClient.invalidateQueries({ queryKey: notesQueries.history(noteId).queryKey }),
-      ])
+      return queryClient.invalidateQueries({ queryKey: notesQueries.list().queryKey })
     },
   })
 }

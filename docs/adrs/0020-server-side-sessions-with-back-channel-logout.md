@@ -3,7 +3,7 @@
 - Status: Proposed
 - Date: 2026-11-13
 - Drafted with AI assistance; a person must review it before it is accepted.
-- Adapted from bcc-ateam ADR 0022, with the session store in EF Core tables ([0028](0028-relational-domain-data-with-typed-history.md)).
+- Adapted from bcc-ateam ADR 0022, with the session store in EF Core tables.
 
 ## Context
 

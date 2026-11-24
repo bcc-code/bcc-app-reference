@@ -10,7 +10,6 @@
     <PackageReference Include="AwesomeAssertions" />
     <PackageReference Include="Alba" />
     <PackageReference Include="Testcontainers.PostgreSql" />
-    <PackageReference Include="Testcontainers.XunitV3" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="OpenTelemetry.Exporter.InMemory" />
   </ItemGroup>

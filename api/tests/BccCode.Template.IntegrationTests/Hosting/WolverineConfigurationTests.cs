@@ -14,7 +14,7 @@ public sealed class WolverineConfigurationTests(AppFixture fixture) : AppTest(fi
 {
     private IWolverineRuntime Runtime => Fixture.Host.Services.GetRequiredService<IWolverineRuntime>();
 
-    // The relay copies Identity.Name, the display name, into the envelope. Changes name the person by uid instead (ADR 0028).
+    // The relay copies Identity.Name, the display name, into the envelope, which would store it.
     [Fact]
     public void The_user_name_relay_is_off()
     {

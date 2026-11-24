@@ -17,7 +17,7 @@ We will apply the schema with the image's `jasper db-apply` command, which runs 
 - **Locally:** the AppHost runs the API project with `db-apply` as a `schema` resource. The seeder and the API wait for it to complete (standard 02.11), so code that only works because the app migrated itself on start fails locally too.
 - **Tests:** the integration test fixture runs `db-apply` and `db-assert` through the API's own entry point, so storage registered there is covered. The unit test `MigrationTests` also fails when the EF model has changes no migration covers (the same check as `dotnet ef migrations has-pending-model-changes`).
 - **Previews:** `Persistence:Schema` gives each PR preview its own Postgres schema `pr<N>`, and the preview workflow runs the same `db-apply` step ([0027](0027-pr-previews-in-a-preview-project.md)).
-- Schema changes are expand-only, so the previous revision runs against the new schema and a traffic rollback stays safe (standard 06.12). Migrations that add or change an audited table call `history_sync` ([0028](0028-relational-domain-data-with-typed-history.md)).
+- Schema changes are expand-only, so the previous revision runs against the new schema and a traffic rollback stays safe (standard 06.12).
 
 ## Consequences
 

@@ -1,6 +1,6 @@
 # First deploy of an environment
 
-The one-time steps to get an application made from the template running in a new environment (`sandbox` first, then `prod`). After this, every green push to `main` deploys by itself ([ADR 0014](../adrs/0014-build-once-deploy-after-green-ci.md)). The design is in [ADR 0013](../adrs/0013-cloud-run-behind-the-platform-gateway.md). `<app>` is the application's slug (`template` until `scripts/init-app.ps1` has run).
+The one-time steps to get an application made from the template running in a new environment (`sandbox` first, then `prod`). After this, every green push to `main` that changes something deployable (not only docs or tests) deploys by itself ([ADR 0014](../adrs/0014-build-once-deploy-after-green-ci.md)). The design is in [ADR 0013](../adrs/0013-cloud-run-behind-the-platform-gateway.md). `<app>` is the application's slug (`template` until `scripts/init-app.ps1` has run).
 
 ## Variables and secrets
 

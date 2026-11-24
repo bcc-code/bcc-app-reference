@@ -47,7 +47,6 @@ Most of these ADRs are adapted from the BCC A-team application (bcc-ateam). The 
 | [0025](0025-one-feature-project-with-a-host-only-api.md) | One feature project, with host-only infrastructure in the API | Proposed |
 | [0026](0026-telemetry-export-through-the-bcc-monitoring-collector.md) | Telemetry export through the BCC monitoring collector, best effort under request-based billing | Proposed |
 | [0027](0027-pr-previews-in-a-preview-project.md) | PR previews run in a preview project, one Postgres schema per PR | Proposed |
-| [0028](0028-relational-domain-data-with-typed-history.md) | Relational domain data with typed history | Proposed |
 | [0029](0029-timeprovider-as-the-clock.md) | TimeProvider as the clock | Proposed |
 
 This list is kept by hand. When you add an ADR, add its row here.

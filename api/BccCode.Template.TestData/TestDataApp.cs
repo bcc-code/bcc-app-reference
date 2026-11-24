@@ -40,7 +40,7 @@ public static class TestDataApp
             if (!SeedingGate.IsAllowed(environment.EnvironmentName))
                 return Results.Problem($"Resetting data is refused in the environment '{environment.EnvironmentName}'.", statusCode: StatusCodes.Status403Forbidden);
             await seeder.ResetAsync(cancellationToken);
-            return Results.Ok(new { notes = SeedNotes.Plan(TimeProvider.System.GetUtcNow()).Count });
+            return Results.Ok(new { notes = SeedNotes.Plan().Count });
         });
     }
 }

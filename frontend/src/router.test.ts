@@ -7,7 +7,6 @@ import { createAppRouter } from './router'
 // The router loads the page it lets through, and a page with the component library takes seconds to load in jsdom. The
 // guard decides before that, so an empty page stands in.
 vi.mock('@/notes/NoteCreatePage.vue', () => ({ default: { render: () => null } }))
-vi.mock('@/notes/NoteHistoryPage.vue', () => ({ default: { render: () => null } }))
 
 function routerFor(roles: string[]) {
   const queryClient = new QueryClient()
@@ -38,7 +37,5 @@ describe('router', () => {
     const router = routerFor([])
     await router.push('/notes/new')
     expect(router.currentRoute.value.path).toBe('/notes/new')
-    await router.push('/notes/n-1/history')
-    expect(router.currentRoute.value.path).toBe('/notes/n-1/history')
   })
 })

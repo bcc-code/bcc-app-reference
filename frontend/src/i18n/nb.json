@@ -27,17 +27,6 @@
       "body": "Tekst",
       "create": "Opprett notat",
       "save": "Lagre endringer"
-    },
-    "historyOf": "Historikk for {title}",
-    "history": {
-      "link": "Historikk",
-      "title": "Notathistorikk",
-      "version": "Versjon {version}",
-      "steps": {
-        "NoteCreated": "Opprettet",
-        "NoteEdited": "Endret",
-        "NoteArchived": "Arkivert"
-      }
     }
   },
   "admin": {

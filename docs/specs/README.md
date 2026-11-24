@@ -17,6 +17,5 @@ number them, and state the status at the top: `Draft`, `Accepted`, `Superseded b
 
 The template ships without specs. A spec may be an event-model (Emlang or TEML YAML, with a short Markdown reading guide) when the
 design is about what happens in a process, for example bcc-ateam's `references-event-model.md`; keep the model and the guide together and
-state the status at the top like any other spec. The design behind the relational history tables is in bcc-ateam's `relational-domain-data.md` and
-`relational-pilot.md`; [ADR 0028](../adrs/0028-relational-domain-data-with-typed-history.md) records the outcome. Plans and specs that an AI agent writes for itself (`docs/superpowers/`) may be kept, but
+state the status at the top like any other spec. Plans and specs that an AI agent writes for itself (`docs/superpowers/`) may be kept, but
 they do not replace ADRs.

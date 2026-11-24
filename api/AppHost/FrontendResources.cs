@@ -1,3 +1,5 @@
+using Aspire.Hosting.Dotnet;
+
 /// <summary>Where the API gets the frontend from: the Vite dev server, or a built <c>frontend/dist</c> in E2E runs.</summary>
 internal static class FrontendResources
 {
@@ -6,12 +8,12 @@ internal static class FrontendResources
     /// index.html too, so a page opened on Vite's own port breaks; vite.config.ts sends such a browser on to the API's address, and
     /// the dashboard does not list the port.
     /// </summary>
-    public static IResourceBuilder<ProjectResource> WithViteFrontend(this IResourceBuilder<ProjectResource> api, RunMode run)
+    public static IResourceBuilder<DotnetProjectResource> WithViteFrontend(this IResourceBuilder<DotnetProjectResource> api, RunMode run)
     {
         var frontend = api.ApplicationBuilder.AddViteApp("frontend", "../../frontend")
             .WithPnpm()
             .WithParentRelationship(api)
-            .WithEnvironment("TEMPLATE_APP_URL", api.BrowserUrl())
+            .WithEnvironment("TEMPLATE_APP_URL", api.BrowserUrl(run))
             .WithUrlForEndpoint("http", url => url.DisplayLocation = UrlDisplayLocation.DetailsOnly);
         if (run.IsSoleInstance)
             frontend.WithEndpoint("http", endpoint => endpoint.Port = LocalPorts.Vite);
@@ -19,7 +21,7 @@ internal static class FrontendResources
     }
 
     /// <summary>The built frontend served by the API, for E2E runs. <c>Frontend:StaticPath</c> overrides <c>frontend/dist</c>.</summary>
-    public static IResourceBuilder<ProjectResource> WithBuiltFrontend(this IResourceBuilder<ProjectResource> api)
+    public static IResourceBuilder<DotnetProjectResource> WithBuiltFrontend(this IResourceBuilder<DotnetProjectResource> api)
     {
         var builder = api.ApplicationBuilder;
         var staticPath = builder.Configuration["Frontend:StaticPath"]
