@@ -28,12 +28,12 @@
       },
       "Microsoft.Testing.Extensions.TrxReport": {
         "type": "Direct",
-        "requested": "[2.5.2, )",
-        "resolved": "2.5.2",
-        "contentHash": "Rk0LrXgGiS9yIOxmT+suGu4+R4F4qsvPhgEjQ+LEbUienq51AnLtLICfcpY0hjt5uon2RRbMPuJiHc6owW0lTA==",
+        "requested": "[2.5.3, )",
+        "resolved": "2.5.3",
+        "contentHash": "g+iSRKedpiZ9Kpkum1wJ3jWTeZhL+V/kmFHFT9IRhWDDZDSNPIlQCwS0kvn4f6NYtLHNUHdZLLqJ8lzi/ZEktg==",
         "dependencies": {
-          "Microsoft.Testing.Extensions.TrxReport.Abstractions": "2.5.2",
-          "Microsoft.Testing.Platform": "[2.5.2, 3.0.0)"
+          "Microsoft.Testing.Extensions.TrxReport.Abstractions": "2.5.3",
+          "Microsoft.Testing.Platform": "[2.5.3, 3.0.0)"
         }
       },
       "OpenTelemetry.Exporter.InMemory": {
@@ -47,11 +47,11 @@
       },
       "Testcontainers.PostgreSql": {
         "type": "Direct",
-        "requested": "[4.16.0, )",
-        "resolved": "4.16.0",
-        "contentHash": "QqvFS8Oj+i6deH3QJOMd7jgFF9P3h7RZ37wOaoR97ZahMcSYMYCb+COR4nUVznT1d7EavEcZdUs1QV0ow69JiA==",
+        "requested": "[4.17.0, )",
+        "resolved": "4.17.0",
+        "contentHash": "fRb6dVf6QCOkNYmPp0x1MHJFkjBtomV4dpU1YinO87Yw8t5qSzKbSmJ9EsP0CUUZTi5zNjYSkhQ5wBxkvDHrgA==",
         "dependencies": {
-          "Testcontainers": "4.16.0"
+          "Testcontainers": "4.17.0"
         }
       },
       "xunit.v3": {
@@ -78,56 +78,56 @@
       },
       "BccCode.Platform.Apis": {
         "type": "Transitive",
-        "resolved": "2.0.0.20",
-        "contentHash": "m7f+VO2BOEQ/C5b+fgnhLKD3wM4WagTOG/ZW2KE5ph2M89l5IOgMBuGCiNTR9q++LBIB7FiIj4G6R2RVL8OQDw==",
+        "resolved": "2.0.0.22",
+        "contentHash": "UUmy/XC2+MYMKCcwcL1jYYAIkqdWklqoMN+hGNIsYXJXIBwBJHZ7z+VNOgJHAv9IRR5r3B0vjxyO0pa1GW8w5g==",
         "dependencies": {
-          "BccCode.Platform.Auth": "2.0.0.20",
-          "BccCode.Platform.Contracts": "2.0.0.20",
+          "BccCode.Platform.Auth": "2.0.0.22",
+          "BccCode.Platform.Contracts": "2.0.0.22",
           "Newtonsoft.Json": "13.0.4"
         }
       },
       "BccCode.Platform.Auth": {
         "type": "Transitive",
-        "resolved": "2.0.0.20",
-        "contentHash": "KVqXjUyjFRzm0r33f6aJvFPbJClnwIyOEt4a4zu2M5rW4zWrx5N599LO0wTcsnuIxHtMSlpqcx43bu7SR0ti0Q==",
+        "resolved": "2.0.0.22",
+        "contentHash": "oUvr6plx5/Sh6LC/n77z78/R6iF1zhwS97qW4uIk2NBbGn9yM6+9R9KqJNGdE+SDJP03QGCIGB6LhD9Rrt1EYg==",
         "dependencies": {
-          "BccCode.Platform.Contracts": "2.0.0.20",
+          "BccCode.Platform.Contracts": "2.0.0.22",
           "Newtonsoft.Json": "13.0.4"
         }
       },
       "BccCode.Platform.Config": {
         "type": "Transitive",
-        "resolved": "2.0.0.20",
-        "contentHash": "q+DqqUcfBfhf9k71g+Z6dcJhSqa7lqalZzmvZxL5AsOttSdGP2P46HHrPYBiui0Mkyf5/tr3p/LLjC8dDkeDMA==",
+        "resolved": "2.0.0.22",
+        "contentHash": "GGnx800rLOhtByTl/jK+zU15dR9KRE6syrHQorEBcTNqPaZzbHXd63gKhUeIUs4dEhRDhJj1P8jW8ksy7WDrOg==",
         "dependencies": {
-          "BccCode.Platform.Auth": "2.0.0.20",
-          "BccCode.Platform.Contracts": "2.0.0.20"
+          "BccCode.Platform.Auth": "2.0.0.22",
+          "BccCode.Platform.Contracts": "2.0.0.22"
         }
       },
       "BccCode.Platform.Contracts": {
         "type": "Transitive",
-        "resolved": "2.0.0.20",
-        "contentHash": "HjcxR1xZlBu1oKiktwjrHRVxGaf+75l5868YPy95wB07wt64qs5Rjd/GXOzxW0lZ/d9XCPPdqTnaMN5ApbB/Zg==",
+        "resolved": "2.0.0.22",
+        "contentHash": "JX+pvGKcIpfLHyREPW+gk8x/n9hxMLF3N4aZZDpMDd+dKehoYeWPhQCf++beE64BBCXh9y+3VFip/LxoB6vb3Q==",
         "dependencies": {
           "Newtonsoft.Json": "13.0.4"
         }
       },
       "BccCode.PubSub.Client": {
         "type": "Transitive",
-        "resolved": "1.0.49",
-        "contentHash": "wcOQCJlLooROEW0P/IrAldvkoHXRXJ/frktvi5tmrYy7L9HkXZZ3jdvF7hV2dMwk/8Mgmot3+dPux14UTfGpxQ==",
+        "resolved": "1.0.55",
+        "contentHash": "9zSo91LhF6PNPEJePhr9cVi/f4Zt9UTefB89kBpvCSG1Md+ZF0q14G+Z/xnSCEaKWxThRoaNaOVNdyQjyDs23w==",
         "dependencies": {
-          "BccCode.Platform.Apis": "2.0.0.20",
-          "BccCode.Platform.Config": "2.0.0.20",
-          "BccCode.PubSub.Contracts": "1.0.49",
+          "BccCode.Platform.Apis": "2.0.0.22",
+          "BccCode.Platform.Config": "2.0.0.22",
+          "BccCode.PubSub.Contracts": "1.0.55",
           "Microsoft.IdentityModel.JsonWebTokens": "8.19.2",
           "Newtonsoft.Json": "13.0.4"
         }
       },
       "BccCode.PubSub.Contracts": {
         "type": "Transitive",
-        "resolved": "1.0.49",
-        "contentHash": "ymTw1+G9Kz2KIkH1odO8qZqwJi0MIt1VuIytZffjoPAT8MAe9GzKoZiwxeMSfTdR2rJCx6f6CcO1gAXbx+F8fg==",
+        "resolved": "1.0.55",
+        "contentHash": "Ki146eBol+ecH467JbQKkq1hZITNuEv8uHtXeQyIasxQDl4KG69sVFe0bWdWN7sK3yurHChgSxVIZV71FE8/TA==",
         "dependencies": {
           "Google.Cloud.Tasks.V2": "3.7.0",
           "Newtonsoft.Json": "13.0.4"
@@ -707,16 +707,16 @@
       },
       "Microsoft.Testing.Extensions.TrxReport.Abstractions": {
         "type": "Transitive",
-        "resolved": "2.5.2",
-        "contentHash": "+xTIaIU9H44GxOyjrfieMSZnxltGvleA3jCRtdEAzlXKb85pMmVYMLUv2JS8KwD+U2wQHUgvy5YfQfWoPEfVdQ==",
+        "resolved": "2.5.3",
+        "contentHash": "Z/7g5CX3v4lk60s+QT52PS8SRiu9zNJ7KkICSAOea6UqIzDeGg6blXZO35LF1HKLwa8nITNKKRwHjEFBDBUD4g==",
         "dependencies": {
-          "Microsoft.Testing.Platform": "[2.5.2, 3.0.0)"
+          "Microsoft.Testing.Platform": "[2.5.3, 3.0.0)"
         }
       },
       "Microsoft.Testing.Platform": {
         "type": "Transitive",
-        "resolved": "2.5.2",
-        "contentHash": "ocX0rgGY78dKfmZlZe4hB0/dvlh7wJgUAWS+KfwrqxB9DpNsjshnne9dppCKnFNEOkX4QYsrdUU++NInFPiCBw=="
+        "resolved": "2.5.3",
+        "contentHash": "JG78yapjF3r3GUj5UWv3m6r4L5hhdusumlhSoO+bkUakMW4kAInn4q3ulnNy1tqNLiwfumFoukdd+NVGbC3A7g=="
       },
       "Microsoft.Testing.Platform.MSBuild": {
         "type": "Transitive",
@@ -963,8 +963,8 @@
       },
       "Testcontainers": {
         "type": "Transitive",
-        "resolved": "4.16.0",
-        "contentHash": "JmMUZk6ZXQovbGQjaMB+YxOR0PbJTdYjOYjRcrm5LrA2dhLVMuCbhVGGunzCGIQfFMUB5Lno2LPOHMMuaGmuIg==",
+        "resolved": "4.17.0",
+        "contentHash": "yXAdoZ3dcrg84Iy05X10qRfz8EO35tpSmI1kK91Qe32MNz0DyPuSbiCi33i5AvSbYMET9HxBw32UuHJHSSK49A==",
         "dependencies": {
           "Docker.DotNet.Enhanced": "4.3.3",
           "Docker.DotNet.Enhanced.X509": "4.3.3",
@@ -1101,14 +1101,14 @@
         "type": "Project",
         "dependencies": {
           "Aspire.Npgsql": "[17.0.0, )",
-          "BccCode.PubSub.Wolverine": "[1.0.49, )",
+          "BccCode.PubSub.Wolverine": "[1.0.55, )",
           "BccCode.Template": "[1.0.0, )",
           "Google.Cloud.Kms.V1": "[3.27.0, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[11.0.0, )",
           "Microsoft.AspNetCore.Authentication.OpenIdConnect": "[11.0.0, )",
           "Microsoft.AspNetCore.OpenApi": "[11.0.0, )",
           "Microsoft.Extensions.ServiceDiscovery.Yarp": "[11.0.0, )",
-          "Microsoft.OpenApi": "[3.11.0, )",
+          "Microsoft.OpenApi": "[3.11.1, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
           "ServiceDefaults": "[1.0.0, )",
           "WolverineFx.EntityFrameworkCore": "[6.64.0, )",
@@ -1156,12 +1156,12 @@
       },
       "BccCode.PubSub.Wolverine": {
         "type": "CentralTransitive",
-        "requested": "[1.0.49, )",
-        "resolved": "1.0.49",
-        "contentHash": "RJpV769PGsFuC4oNWD1zaBpU7hkzJSzcizFwDANL3pV8+lQQGhXZxml6A3F2BXR6yujU3gRejsLR4yerVLKsxA==",
+        "requested": "[1.0.55, )",
+        "resolved": "1.0.55",
+        "contentHash": "BALIvy79EsdoWaTPN7FT8zTTmGMWihB9dWkhSGyC3cXCwbF8aIafT+NFpAY+6mpA/IPOnQik0htJMOtCiWJEdg==",
         "dependencies": {
-          "BccCode.PubSub.Client": "1.0.49",
-          "WolverineFx": "6.61.0"
+          "BccCode.PubSub.Client": "1.0.55",
+          "WolverineFx": "6.64.0"
         }
       },
       "EFCore.NamingConventions": {
@@ -1284,9 +1284,9 @@
       },
       "Microsoft.OpenApi": {
         "type": "CentralTransitive",
-        "requested": "[3.11.0, )",
-        "resolved": "3.11.0",
-        "contentHash": "kvQz+mL/fnDw2VaE8zMyQhbMv7FmOYUydIhCVNKxQdrLu9XiMT/07DHwJ5YkRO2uzcxTFvMAKFKKywxoyLKHcA=="
+        "requested": "[3.11.1, )",
+        "resolved": "3.11.1",
+        "contentHash": "WZL9g2+9NPICW4Es6zjIBj4mmKxAnI8RCru3gAZUliCMZPnuaxRynXq4cXoU+IYvI7kXY4ydSrrJ1R9EEHr+Lw=="
       },
       "Npgsql": {
         "type": "CentralTransitive",
