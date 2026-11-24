@@ -19,7 +19,7 @@
   <!-- why: EF Core stays on 10.0.x. EF Core 11 waits for Npgsql.EntityFrameworkCore.PostgreSQL 11 and EFCore.NamingConventions 11,
        and WolverineFx.EntityFrameworkCore is built on EF Core 10. -->
   <ItemGroup Label="EF Core (dotnet-ef in .config/dotnet-tools.json is the same version)">
-    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.15" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="11.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.15" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />
