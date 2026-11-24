@@ -1153,11 +1153,11 @@
       },
       "WolverineFx.RDBMS": {
         "type": "Transitive",
-        "resolved": "6.64.0",
-        "contentHash": "Klrsjh1JhFOhqgqJIpwjTjwpJmdsDdtDy3elObXC5AskHNJtleQHWVpvhC1QorwoyLyKnUqwJpe4q1fEpgPZ1w==",
+        "resolved": "6.64.2",
+        "contentHash": "EPMlZmGXsy0E/E6ule58yCal+IREHAhwyKk01EH0R2FWYCBhVbnd1+II0WE6EH+me9Ay5pGh7vvQKi2jQbGpyg==",
         "dependencies": {
           "Weasel.Core": "9.50.0",
-          "WolverineFx": "6.64.0"
+          "WolverineFx": "6.64.2"
         }
       },
       "xunit.analyzers": {
@@ -1234,8 +1234,8 @@
           "EFCore.NamingConventions": "[10.0.1, )",
           "Microsoft.EntityFrameworkCore": "[10.0.15, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
-          "WolverineFx.EntityFrameworkCore": "[6.64.0, )",
-          "WolverineFx.Http": "[6.64.0, )"
+          "WolverineFx.EntityFrameworkCore": "[6.64.2, )",
+          "WolverineFx.Http": "[6.64.2, )"
         }
       },
       "bcccode.template.api": {
@@ -1249,16 +1249,16 @@
           "Microsoft.AspNetCore.Authentication.OpenIdConnect": "[11.0.0, )",
           "Microsoft.AspNetCore.OpenApi": "[11.0.0, )",
           "Microsoft.Extensions.ServiceDiscovery.Yarp": "[11.0.0, )",
-          "Microsoft.OpenApi": "[3.11.0, )",
+          "Microsoft.OpenApi": "[3.11.1, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
           "ServiceDefaults": "[1.0.0, )",
-          "WolverineFx.EntityFrameworkCore": "[6.64.0, )",
-          "WolverineFx.Http": "[6.64.0, )",
+          "WolverineFx.EntityFrameworkCore": "[6.64.2, )",
+          "WolverineFx.Http": "[6.64.2, )",
           "WolverineFx.Http.FluentValidation": "[6.64.0, )",
-          "WolverineFx.Postgresql": "[6.64.0, )",
-          "WolverineFx.Pubsub": "[6.64.0, )",
-          "WolverineFx.Pubsub.Http": "[6.64.0, )",
-          "WolverineFx.RuntimeCompilation": "[6.64.0, )",
+          "WolverineFx.Postgresql": "[6.64.2, )",
+          "WolverineFx.Pubsub": "[6.64.2, )",
+          "WolverineFx.Pubsub.Http": "[6.64.2, )",
+          "WolverineFx.RuntimeCompilation": "[6.64.2, )",
           "Yarp.ReverseProxy": "[2.3.0, )"
         }
       },
@@ -1426,9 +1426,9 @@
       },
       "Microsoft.OpenApi": {
         "type": "CentralTransitive",
-        "requested": "[3.11.0, )",
-        "resolved": "3.11.0",
-        "contentHash": "kvQz+mL/fnDw2VaE8zMyQhbMv7FmOYUydIhCVNKxQdrLu9XiMT/07DHwJ5YkRO2uzcxTFvMAKFKKywxoyLKHcA=="
+        "requested": "[3.11.1, )",
+        "resolved": "3.11.1",
+        "contentHash": "WZL9g2+9NPICW4Es6zjIBj4mmKxAnI8RCru3gAZUliCMZPnuaxRynXq4cXoU+IYvI7kXY4ydSrrJ1R9EEHr+Lw=="
       },
       "Npgsql": {
         "type": "CentralTransitive",
@@ -1515,26 +1515,26 @@
       },
       "WolverineFx.EntityFrameworkCore": {
         "type": "CentralTransitive",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "SYn1juewjXZLG8gzwrtD3k6/LjP3Lg4MCDbW8ww6A3y418xpfYujterg1HHKHcLRnRu4Z7f1CEOIttFEip8hBw==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "TCFTp9HABtrGhyeNdCqz3F+jMMCDbUIYpUptqlSDAjOBk717WzA+BYw47+gJWazxAgh1P5K7SqrU0v0jHKZnoA==",
         "dependencies": {
           "Microsoft.EntityFrameworkCore": "10.0.4",
           "Microsoft.EntityFrameworkCore.Design": "10.0.4",
           "Microsoft.EntityFrameworkCore.Relational": "10.0.4",
           "Weasel.EntityFrameworkCore": "9.50.0",
-          "WolverineFx.RDBMS": "6.64.0"
+          "WolverineFx.RDBMS": "6.64.2"
         }
       },
       "WolverineFx.Http": {
         "type": "CentralTransitive",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "sx6YnkuSEN2RHMKqH1Jj1/n4+l8OHd9vtgc8G/OnAH7I2T1wHX2jqu5LRXT8OPWbSCMNg7GOKJeAYFPX/MqaQA==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "/0KOu+nUlYzhJ+dg3I/8FzayVZvyL+onnSIgV4cqn2cawfW4t4DY0FU9BStmWEdhj5dL3Lm7thdkVb0HoFmKqw==",
         "dependencies": {
           "Asp.Versioning.Abstractions": "[10.0.0, 11.0.0)",
           "JasperFx.SourceGenerator": "2.102.0",
-          "WolverineFx": "6.64.0"
+          "WolverineFx": "6.64.2"
         }
       },
       "WolverineFx.Http.FluentValidation": {
@@ -1549,42 +1549,42 @@
       },
       "WolverineFx.Postgresql": {
         "type": "CentralTransitive",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "2oQduQBFxVGH11zOxlqlS/d8SjJUaZaN+sFcRnXK+SgFmozu9QjFDuRlw3i3hOK42cpnG9hfkDxs5Reot3Gr3A==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "HHFCEutzHAiM8oTG+a+CRaXU08HtZwL0hTs+ilPYMZAdbLQf9M5CaF9JDH2PQx4MS/zBSnDOqXfepr2xMaS+Yg==",
         "dependencies": {
           "Weasel.Postgresql": "9.50.0",
-          "WolverineFx.RDBMS": "6.64.0"
+          "WolverineFx.RDBMS": "6.64.2"
         }
       },
       "WolverineFx.Pubsub": {
         "type": "CentralTransitive",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "vNFX6FmgFuGMMZpdK3o53do6QnzkWZ33fVMFEZwOC1RGPg26YMr0/H8JtAbX3UN/iBGE283Tu9xWU2M0Dwcaww==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "lBZxkJ5R1LfCVp5ZqqpBvulBMxSkd4Mx+A4w+/f4xiGKAvn9pyhqNL50OJ04w02omioVhLIrQitRyhyVCO/itA==",
         "dependencies": {
           "Google.Cloud.PubSub.V1": "3.24.0",
-          "WolverineFx": "6.64.0"
+          "WolverineFx": "6.64.2"
         }
       },
       "WolverineFx.Pubsub.Http": {
         "type": "CentralTransitive",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "KwJi2VXSVXbodZaElnJXSyVDvT+eqEwjATuJo+nurlb6ZfCELZxdKgSe1rmIcOAYufYlGiBhXCM1PwVQt5wWyw==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "1u8Mqpovq2NoIpEHkgXLJxQrVqvsNUtxvQDDgAMQqZeAZfrGjh8RMH89qRPMnwDX49EGr+CpVMSQ0rCgfzF0XA==",
         "dependencies": {
-          "WolverineFx.Http": "6.64.0",
-          "WolverineFx.Pubsub": "6.64.0"
+          "WolverineFx.Http": "6.64.2",
+          "WolverineFx.Pubsub": "6.64.2"
         }
       },
       "WolverineFx.RuntimeCompilation": {
         "type": "CentralTransitive",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "dMNmIIntswBpukJ/80CJA5jGlqMXa+t09eWlFbKZSXvz0e3btgCUJexNNHdndaBl0lCABflMJ12wjhZLhMxvXg==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "rmjLtFtarXQXCrn+j8u+Wcwq73iLoyP4l2Rk5k+HyldXCwdtLCoMX87LNPf5aWoY5TzdhboV4mNfYJhicqhp3Q==",
         "dependencies": {
           "JasperFx.RuntimeCompiler": "5.1.0",
-          "WolverineFx": "6.64.0"
+          "WolverineFx": "6.64.2"
         }
       },
       "Yarp.ReverseProxy": {

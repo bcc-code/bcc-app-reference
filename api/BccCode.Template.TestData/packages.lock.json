@@ -409,11 +409,11 @@
       },
       "WolverineFx.RDBMS": {
         "type": "Transitive",
-        "resolved": "6.64.0",
-        "contentHash": "Klrsjh1JhFOhqgqJIpwjTjwpJmdsDdtDy3elObXC5AskHNJtleQHWVpvhC1QorwoyLyKnUqwJpe4q1fEpgPZ1w==",
+        "resolved": "6.64.2",
+        "contentHash": "EPMlZmGXsy0E/E6ule58yCal+IREHAhwyKk01EH0R2FWYCBhVbnd1+II0WE6EH+me9Ay5pGh7vvQKi2jQbGpyg==",
         "dependencies": {
           "Weasel.Core": "9.50.0",
-          "WolverineFx": "6.64.0"
+          "WolverineFx": "6.64.2"
         }
       },
       "bcccode.template": {
@@ -422,8 +422,8 @@
           "EFCore.NamingConventions": "[10.0.1, )",
           "Microsoft.EntityFrameworkCore": "[10.0.15, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
-          "WolverineFx.EntityFrameworkCore": "[6.64.0, )",
-          "WolverineFx.Http": "[6.64.0, )"
+          "WolverineFx.EntityFrameworkCore": "[6.64.2, )",
+          "WolverineFx.Http": "[6.64.2, )"
         }
       },
       "servicedefaults": {
@@ -578,26 +578,26 @@
       },
       "WolverineFx.EntityFrameworkCore": {
         "type": "CentralTransitive",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "SYn1juewjXZLG8gzwrtD3k6/LjP3Lg4MCDbW8ww6A3y418xpfYujterg1HHKHcLRnRu4Z7f1CEOIttFEip8hBw==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "TCFTp9HABtrGhyeNdCqz3F+jMMCDbUIYpUptqlSDAjOBk717WzA+BYw47+gJWazxAgh1P5K7SqrU0v0jHKZnoA==",
         "dependencies": {
           "Microsoft.EntityFrameworkCore": "10.0.4",
           "Microsoft.EntityFrameworkCore.Design": "10.0.4",
           "Microsoft.EntityFrameworkCore.Relational": "10.0.4",
           "Weasel.EntityFrameworkCore": "9.50.0",
-          "WolverineFx.RDBMS": "6.64.0"
+          "WolverineFx.RDBMS": "6.64.2"
         }
       },
       "WolverineFx.Http": {
         "type": "CentralTransitive",
-        "requested": "[6.64.0, )",
-        "resolved": "6.64.0",
-        "contentHash": "sx6YnkuSEN2RHMKqH1Jj1/n4+l8OHd9vtgc8G/OnAH7I2T1wHX2jqu5LRXT8OPWbSCMNg7GOKJeAYFPX/MqaQA==",
+        "requested": "[6.64.2, )",
+        "resolved": "6.64.2",
+        "contentHash": "/0KOu+nUlYzhJ+dg3I/8FzayVZvyL+onnSIgV4cqn2cawfW4t4DY0FU9BStmWEdhj5dL3Lm7thdkVb0HoFmKqw==",
         "dependencies": {
           "Asp.Versioning.Abstractions": "[10.0.0, 11.0.0)",
           "JasperFx.SourceGenerator": "2.102.0",
-          "WolverineFx": "6.64.0"
+          "WolverineFx": "6.64.2"
         }
       }
     }
