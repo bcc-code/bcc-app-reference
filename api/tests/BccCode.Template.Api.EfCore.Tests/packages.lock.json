@@ -4,13 +4,14 @@
     "net10.0": {
       "Alba": {
         "type": "Direct",
-        "requested": "[8.5.3, )",
-        "resolved": "8.5.3",
-        "contentHash": "E4YOI8oaY4MUP63Xhl+xzuViycIE8sIw5XlIRbbqJg7UV04RrA1crUEXt4Pj9ezzvaQZJxol2J8gMeUpykLRQw==",
+        "requested": "[9.0.0, )",
+        "resolved": "9.0.0",
+        "contentHash": "Xb2iAU66duAtu5shpjDK2kYotWCfP9NRYRSBlKxGBDKA26vO9ata0nNHw/N5YE1icprNcUox9wCOaPFtVhEwTg==",
         "dependencies": {
-          "IdentityModel": "6.2.0",
+          "Duende.IdentityModel": "8.1.0",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "10.0.0",
-          "Microsoft.AspNetCore.Mvc.Testing": "10.0.0"
+          "Microsoft.AspNetCore.Mvc.Testing": "10.0.0",
+          "Microsoft.Extensions.TimeProvider.Testing": "10.7.0"
         }
       },
       "AwesomeAssertions": {
@@ -114,6 +115,11 @@
         "dependencies": {
           "Docker.DotNet.Enhanced.Handler.Abstractions": "4.3.3"
         }
+      },
+      "Duende.IdentityModel": {
+        "type": "Transitive",
+        "resolved": "8.1.0",
+        "contentHash": "ncmC2ISg0efTqY74xI6gaLKlv4mErT5ruYK262dkSnAv07g9qYC2++q7AWWs1FyP2c0YZ6LvUtcoJmxZqYyVrA=="
       },
       "FastExpressionCompiler": {
         "type": "Transitive",
@@ -248,11 +254,6 @@
         "type": "Transitive",
         "resolved": "2.14.1",
         "contentHash": "lQKvtaTDOXnoVJ20ibTuSIOf2i0uO0MPbDhd1jm238I+U/2ZnRENj0cktKZhtchBMtCUSRQ5v4xBCUbKNmyVMw=="
-      },
-      "IdentityModel": {
-        "type": "Transitive",
-        "resolved": "6.2.0",
-        "contentHash": "4AXZ6Tp+DNwrSSeBziiX/231i8ZpD77A9nEMyc68gLSCWG0kgWsIBeFquYcBebiIPkfB7GEXzCYuuLeR1QZJIQ=="
       },
       "ImTools": {
         "type": "Transitive",
