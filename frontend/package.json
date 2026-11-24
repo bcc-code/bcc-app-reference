@@ -17,16 +17,16 @@
     "generate": "dotnet run --project ../api/BccCode.Template.Api -- jasper openapi --output BccCode.Template.Api.json && openapi-ts"
   },
   "dependencies": {
-    "@bcc-code/component-library-vue": "^1.5.4",
+    "@bcc-code/component-library-vue": "^1.5.6",
     "@bcc-code/icons-vue": "^1.5.4",
-    "@tailwindcss/vite": "^4.3.4",
-    "@tanstack/vue-query": "5.105.3",
+    "@tailwindcss/vite": "^4.3.5",
+    "@tanstack/vue-query": "5.107.2",
     "@vuelidate/core": "^2.0.3",
     "@vuelidate/validators": "^2.0.4",
-    "tailwindcss": "^4.3.4",
+    "tailwindcss": "^4.3.5",
     "vue": "^3.5.44",
-    "vue-i18n": "^11.4.17",
-    "vue-router": "^5.4.0"
+    "vue-i18n": "^11.4.21",
+    "vue-router": "^5.5.1"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.99.0",
