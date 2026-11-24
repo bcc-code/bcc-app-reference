@@ -268,7 +268,7 @@ jobs:
           image=$(sed -n 's/^FROM \(.*\) AS structurizr$/\1/p' docs/architecture/Dockerfile)
           docker run --rm -v "$PWD/docs/architecture:/usr/local/structurizr:ro" "$image" validate -workspace /usr/local/structurizr/workspace.dsl
       - name: The exported diagrams are current
-        run: docs/architecture/export.sh --check || { echo "::error::Run docs/architecture/export.sh (or export.ps1) and commit docs/architecture/diagrams"; exit 1; }
+        run: bash docs/architecture/export.sh --check || { echo "::error::Run docs/architecture/export.sh (or export.ps1) and commit docs/architecture/diagrams"; exit 1; }
 
   # Runs on every change: a secret can be committed in any file.
   gitleaks:
