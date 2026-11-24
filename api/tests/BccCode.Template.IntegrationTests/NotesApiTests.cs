@@ -1,3 +1,4 @@
+using AwesomeAssertions.Equivalency;
 using BccCode.Template.Admin;
 using BccCode.Template.IntegrationTests.Infrastructure;
 using BccCode.Template.Notes;
@@ -15,6 +16,13 @@ namespace BccCode.Template.IntegrationTests;
 /// <summary>The notes contract, through the real host and a real Postgres. Each test uses users of its own.</summary>
 public class NotesApiTests(AppFixture fixture) : AppTest(fixture)
 {
+    // A write returns the clock's time to 100 ns; Postgres stores microseconds, so a later read can be up to 1 µs earlier.
+    private static EquivalencyOptions<T> StoredTimes<T>(EquivalencyOptions<T> options)
+    {
+        return options
+            .Using<DateTimeOffset>(ctx => ctx.Subject.Should().BeCloseTo(ctx.Expectation, TimeSpan.FromMicroseconds(1)))
+            .WhenTypeIs<DateTimeOffset>();
+    }
 
     private async Task<CreateNoteResponse> CreateAsync(TestUser user, string title = "Title", string body = "Body")
     {
@@ -81,7 +89,7 @@ public class NotesApiTests(AppFixture fixture) : AppTest(fixture)
 
         var result = await Host.Scenario(s => { s.As(user); s.Get.Url($"/api/notes/{created.Id}"); });
 
-        (await result.ReadAsJsonAsync<GetNoteResponse>()).Should().BeEquivalentTo(created);
+        (await result.ReadAsJsonAsync<GetNoteResponse>()).Should().BeEquivalentTo(created, StoredTimes);
     }
 
     [Fact]
@@ -112,9 +120,10 @@ public class NotesApiTests(AppFixture fixture) : AppTest(fixture)
         });
 
         var edited = (await result.ReadAsJsonAsync<EditNoteResponse>())!;
-        edited.Should().Match<EditNoteResponse>(n => n.Title == "New" && n.Body == "New body" && n.Version == 2 && n.CreatedAt == note.CreatedAt);
+        edited.Should().Match<EditNoteResponse>(n => n.Title == "New" && n.Body == "New body" && n.Version == 2);
+        edited.CreatedAt.Should().BeCloseTo(note.CreatedAt, TimeSpan.FromMicroseconds(1));
         var read = await Host.Scenario(s => { s.As(user); s.Get.Url($"/api/notes/{note.Id}"); });
-        (await read.ReadAsJsonAsync<GetNoteResponse>()).Should().BeEquivalentTo(edited);
+        (await read.ReadAsJsonAsync<GetNoteResponse>()).Should().BeEquivalentTo(edited, StoredTimes);
     }
 
     [Fact]

@@ -84,7 +84,9 @@ and the snapshot is right in any case.
 
 - Each entity changes only through its own methods (`Note.Create`, `Edit`, `Archive`), which take the time from the endpoint and raise
   `version`. `version` is mapped with `IsConcurrencyToken()`: a stale save fails and answers 409 (`DbConcurrencyMiddleware`).
-- Endpoints take a `TimeProvider` and call `PostgresTime.Now`, which cuts the time to the microseconds Postgres keeps.
+- Endpoints take a `TimeProvider` and call `GetUtcNow()`. The time a write returns has 100 ns
+  precision and Postgres stores microseconds, so a later read of the same row can be up to 1 µs earlier. Clients compare
+  `version`, not timestamps.
 - The app never deletes a domain row: a business removal sets `archived_at`, and a query filter hides the row. Revoking the delete
   right and the erasure procedure are not built yet; an application adds them with its retention rule
   ([data inventory](../data-protection/data-inventory.md#anonymization-and-erasure)).

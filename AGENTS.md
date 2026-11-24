@@ -152,8 +152,9 @@ Each rule says why, and which test or guard enforces it (standard 24.3).
   route lacks its policy (`InternalRouteGuard`). The push mapper refuses (400) any type that is not an `IInternalMessage`.
   `Internal:AllowAll=true` is for local runs and tests only; the host refuses it outside Development and Test.
 - **A row changes only through its entity's methods, which take the time and raise `version`.** `version` is the concurrency token
-  (409 on a stale save). Removal is soft (`archived_at`, hidden by a query filter). Endpoints take a `TimeProvider` and use
-  `PostgresTime.Now`, which cuts the time to the microseconds Postgres keeps, so what a write returns equals what a read returns.
+  (409 on a stale save). Removal is soft (`archived_at`, hidden by a query filter). Endpoints take a `TimeProvider` and call
+  `GetUtcNow()`. A write returns that time to 100 ns; Postgres keeps microseconds, so a later read can be up to 1 µs earlier.
+  Do not compare a write's timestamps exactly with a read's; `version` is what tells two states apart.
 - **Time comes from `TimeProvider`**, never `DateTime(Offset).Now/UtcNow/Today`. `BannedSymbols.txt` and the banned-API analyzer make it a
   build error (RS0030); the feature project also bans `TimeProvider.System`, which only the host's composition root may use. Not NodaTime
   ([ADR 0029](docs/adrs/0029-timeprovider-as-the-clock.md)).

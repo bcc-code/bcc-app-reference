@@ -44,7 +44,7 @@ public static class EditNoteEndpoint
     public static EditNoteResponse Post(EditNoteRequest request, [NotBody] Note note, TimeProvider time)
     {
         // The note is tracked: the transaction's save writes the edit, with the version that was read in the WHERE clause.
-        note.Edit(PostgresTime.Now(time), NoteContent.Parse(request.Title, request.Body));
+        note.Edit(time.GetUtcNow(), NoteContent.Parse(request.Title, request.Body));
         return new EditNoteResponse(note.Id, note.Title, note.Body, note.CreatedAt, note.UpdatedAt, note.Version);
     }
 }

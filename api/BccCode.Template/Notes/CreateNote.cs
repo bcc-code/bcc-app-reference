@@ -1,4 +1,3 @@
-using BccCode.Template.Persistence;
 using BccCode.Template.Security;
 using Wolverine.Persistence;
 
@@ -21,7 +20,7 @@ public static class CreateNoteEndpoint
     [WolverinePost("/api/notes")]
     public static (Created<CreateNoteResponse>, IStorageAction<Note>) Post(CreateNoteRequest request, CallerAccess access, TimeProvider time)
     {
-        var now = PostgresTime.Now(time);
+        var now = time.GetUtcNow();
         var note = Note.Create(Guid.CreateVersion7(now), now, access.PersonUid, NoteContent.Parse(request.Title, request.Body));
         var response = new CreateNoteResponse(note.Id, note.Title, note.Body, note.CreatedAt, note.UpdatedAt, note.Version);
         return (TypedResults.Created($"/api/notes/{note.Id}", response), Storage.Insert(note));

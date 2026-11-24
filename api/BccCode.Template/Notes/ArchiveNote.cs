@@ -30,7 +30,7 @@ public static class ArchiveNoteEndpoint
     [SuppressMessage("Style", "IDE0060:Remove unused parameter", Justification = "Wolverine binds the request body for Before only when Post takes the request too.")]
     public static NoteArchivedMessage Post(ArchiveNoteRequest request, [NotBody] Note note, TimeProvider time)
     {
-        note.Archive(PostgresTime.Now(time));
+        note.Archive(time.GetUtcNow());
         // The update and the message are stored in one transaction; the message is sent after the commit.
         return new NoteArchivedMessage(note.Id);
     }
