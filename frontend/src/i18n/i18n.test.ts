@@ -2,7 +2,7 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { supportedLanguages } from '.'
+import { createTemplateI18n, supportedLanguages } from '.'
 
 type Tree = { [key: string]: string | Tree }
 
@@ -51,7 +51,10 @@ const backendSource = read(
 )
 
 /** Keys built at run time, as `t(\`prefix.${value}\`)`. Each pattern names the place that builds them and must match a key. */
-const runtimeKeys: { pattern: RegExp; builtBy: string }[] = []
+const runtimeKeys: { pattern: RegExp; builtBy: string }[] = [
+  // The failed Vuelidate rule's name.
+  { pattern: /^form\.alerts\.[A-Za-z0-9]+$/, builtBy: 'errorMessages in components/validation.ts' },
+]
 
 function isUsed(key: string): boolean {
   const escaped = key.replaceAll('.', String.raw`\.`)
@@ -94,6 +97,31 @@ describe('translations', () => {
   // A key listed here is in en.json but nothing names it: remove it from every language file, or add its run-time pattern to runtimeKeys.
   it('have no key that nothing uses', () => {
     expect([...english.keys()].filter((key) => !isUsed(key))).toEqual([])
+  })
+
+  // vue-i18n compiles a message the first time it is shown, so a message it cannot parse only fails on the page that shows
+  // it: a literal `@` in a hint (a linked message to vue-i18n) is one example. A literal `@`, `{`, `}` or `|` goes in as {'@'} and so on.
+  it('compile every message', () => {
+    const failures = Object.entries(messages).flatMap(([language, map]) => {
+      const { t } = createTemplateI18n(language as (typeof supportedLanguages)[number]).global
+      return [...map.keys()].flatMap((key) => {
+        try {
+          t(key)
+          return []
+        } catch (error) {
+          return [`${language}: ${key}: ${(error as Error).message.split('\n')[0]}`]
+        }
+      })
+    })
+    expect(failures).toEqual([])
+  })
+
+  // A pattern that outlives the code that builds its keys would hide an unused key.
+  it('have a key for every runtime pattern', () => {
+    const dead = runtimeKeys
+      .filter(({ pattern }) => ![...english.keys()].some((key) => pattern.test(key)))
+      .map(({ builtBy }) => builtBy)
+    expect(dead).toEqual([])
   })
 
   it('have every errors key the API names', () => {

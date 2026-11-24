@@ -1,0 +1,46 @@
+name: Provision Project
+run-name: Provision Project - ${{ inputs.environment }} - ${{ inputs.action }}
+
+# Creates the GCP project, the CI service account sa-gha-cicd with its Workload Identity Federation binding to this
+# repository's GitHub environment, the Terraform state and the GitHub environment variables (PROPS, GCP_PROJECT_ID, ...).
+# Run once per environment. The application infrastructure is in infra/ (infra.yml, deploy.yml).
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        default: sandbox
+        options:
+          - sandbox
+          - dev
+          - prod
+      action:
+        type: choice
+        default: apply
+        options:
+          - apply
+          - plan
+          - plan destroy
+          - destroy
+
+permissions:
+  contents: read
+
+jobs:
+  provisioning:
+    name: Provisioning
+    # @main, not a SHA (exception in standards 03.5 and 17.7): the platform's GCP workload identity trusts the job_workflow_ref
+    # of bcc-platform-deploy at refs/heads/main, so a commit pin is refused (403 getOpenIdToken). Same as other BCC repos.
+    uses: bcc-code/bcc-platform-deploy/.github/workflows/landing-zone.yml@main
+    permissions:
+      id-token: write # requesting the JWT
+      contents: read # actions/checkout in the called workflow
+    with:
+      project-name: bcc-template # bcc-<app slug> (init-app.ps1 replaces "template"), as `app` in infra/main.tf
+      environment: ${{ inputs.environment }}
+      deploy_on: Google Cloud
+      use-shared-db: true
+      repositories: ${{ github.repository }}
+      teams: core-team
+      gcp-billing-account: BCC - Nordcloud
+      action: ${{ inputs.action }}

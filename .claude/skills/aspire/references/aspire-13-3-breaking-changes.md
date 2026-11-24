@@ -1,7 +1,5 @@
 # Aspire 13.3 Breaking Changes — Agent Reference
 
-> **This repo:** there is no `aspireify` or `aspire-init` skill here. The AppHost already exists in `api/AppHost/`; see `aspire/references/csharp-apphosts.md` for authoring patterns. Entries below that mention `aspireify` are history.
-
 Single, agent-facing scrub list of every 13.3 breaking change that may affect agent-generated
 code, scripts, CI snippets, or skill routing. Source:
 [Aspire 13.3 release notes](https://aspire.dev/whats-new/aspire-13-3/).

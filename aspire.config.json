@@ -1,1 +1,1 @@
-{ "appHost": { "path": "api/AppHost/AppHost.csproj" }, "features": { "defaultWatchEnabled": true } }
+{ "appHost": { "path": "api/AppHost/AppHost.csproj" }, "sdk": { "version": "17.0.0" }, "features": { "defaultWatchEnabled": false } }

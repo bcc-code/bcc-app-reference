@@ -1,24 +1,26 @@
-import { BccComponentLibrary } from '@bcc-code/component-library-vue'
-import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
+import { VueQueryPlugin } from '@tanstack/vue-query'
 import { createApp } from 'vue'
 import App from './App.vue'
 import { client } from './client/client.gen'
+import { cspNonce, installBccComponentLibrary } from './csp'
 import { createTemplateI18n, pickLanguage } from './i18n'
-import { templateFetch } from './lib/templateFetch'
+import { rememberedLanguage } from './i18n/locale'
+import { withStatus } from './lib/problems'
+import { queryClient } from './queryClient'
 import { createAppRouter } from './router'
 import { assertLayerOrder } from './style/layerOrder'
 import './style/main.css'
 
-// All API traffic goes through the one wrapper: CSRF token, one retry on a stale token, and login on 401.
-client.setConfig({ fetch: templateFetch, throwOnError: true })
+// The client throws an empty object for a 403 and a 404, which have no body: keep their status for the messages.
+client.interceptors.error.use(withStatus)
 
 // Runtime settings come from the server (/api/me), never from build-time variables or secrets.
-const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } })
 const router = createAppRouter(queryClient)
 const app = createApp(App)
-app.use(BccComponentLibrary)
-assertLayerOrder()
-const i18n = createTemplateI18n(pickLanguage([...navigator.languages, document.documentElement.lang]))
+const nonce = cspNonce()
+installBccComponentLibrary(app, nonce)
+assertLayerOrder(nonce)
+const i18n = createTemplateI18n(rememberedLanguage() ?? pickLanguage([...navigator.languages, document.documentElement.lang]))
 document.documentElement.lang = i18n.global.locale.value
 app.use(i18n)
 app.use(router)

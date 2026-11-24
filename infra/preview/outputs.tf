@@ -1,7 +1,14 @@
-output "api_service" {
-  value = google_cloud_run_v2_service.api.name
+output "api_url" {
+  description = "Public URL of the preview application."
+  value       = local.api_url
 }
 
-output "api_url" {
-  value = google_cloud_run_v2_service.api.uri
+output "oidc_url" {
+  description = "Public URL of the preview's mock identity provider."
+  value       = local.oidc_url
+}
+
+output "schema" {
+  description = "The preview's Postgres schema (Persistence__Schema)."
+  value       = local.slug
 }

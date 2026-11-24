@@ -1,21 +1,14 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.6.0">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <UserSecretsId>bcc-template-apphost</UserSecretsId>
-    <!-- ASPIRE010: the AppHost runs through dotnet run and the aspire.cli tool manifest, not the Aspire CLI bundle. -->
-    <NoWarn>$(NoWarn);ASPIRE010</NoWarn>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
+  <!-- No ProjectReferences to the services: AddDotnetProject takes their paths, and Aspire builds them once when the app starts. A
+       reference here only made the AppHost build compile them first. The E2E project holds build-order-only references instead. -->
   <ItemGroup>
-    <ProjectReference Include="..\OidcMock\OidcMock.csproj" />
-    <!-- One reference per persistence variant. Template:Persistence picks which of them runs (see Program.cs). -->
-    <!-- template:only-efcore:begin -->
-    <ProjectReference Include="..\BccCode.Template.Api.EfCore\BccCode.Template.Api.EfCore.csproj" />
-    <!-- template:only-efcore:end -->
-    <!-- template:only-marten:begin -->
-    <ProjectReference Include="..\BccCode.Template.Api.Marten\BccCode.Template.Api.Marten.csproj" />
-    <!-- template:only-marten:end -->
-  </ItemGroup>
-  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+    <PackageReference Include="Aspire.Hosting.Dotnet" />
     <PackageReference Include="Aspire.Hosting.JavaScript" />
     <PackageReference Include="Aspire.Hosting.PostgreSQL" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.PostgreSQL.Extensions" />

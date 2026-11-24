@@ -8,11 +8,6 @@
     "notes": "Notater",
     "stats": "Statistikk"
   },
-  "user": {
-    "menu": "{name}, kontomeny",
-    "signedInAs": "Logget inn som {name}",
-    "logout": "Logg ut"
-  },
   "common": {
     "loading": "Laster…",
     "back": "Tilbake til notater"
@@ -57,7 +52,7 @@
     "notFound": "Vi fant ikke det du ba om.",
     "conflict": "Noen andre endret dette samtidig. Last inn siste versjon og prøv igjen.",
     "validation": "Noen av verdiene er ikke gyldige.",
-    "csrf": "Siden har stått åpen for lenge. Last den på nytt og prøv igjen.",
+    "mfaRequired": "Logg inn på nytt med en andre faktor.",
     "tooManyRequests": "For mange forespørsler. Vent litt og prøv igjen.",
     "unexpected": "Noe gikk galt. Prøv igjen.",
     "note": {
@@ -65,6 +60,20 @@
       "titleRequired": "Skriv inn en tittel.",
       "titleTooLong": "Tittelen kan være på høyst 200 tegn.",
       "bodyTooLong": "Teksten kan være på høyst 10 000 tegn."
+    }
+  },
+  "layout": {
+    "language": "Språk"
+  },
+  "users": {
+    "signOut": "Logg ut"
+  },
+  "form": {
+    "alerts": {
+      "required": "Dette feltet er obligatorisk.",
+      "checkField": "Kontroller dette feltet.",
+      "maxLength200": "Dette feltet kan ikke ha mer enn 200 tegn.",
+      "maxLength10000": "Dette feltet kan ikke ha mer enn 10 000 tegn."
     }
   }
 }

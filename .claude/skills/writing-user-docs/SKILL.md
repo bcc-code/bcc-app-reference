@@ -1,13 +1,13 @@
 ---
 name: writing-user-docs
-description: Use when writing, restructuring or reviewing end-user documentation under docs/user-manual/, or any page that follows Diataxis (tutorials, how-to guides, reference, explanation), or when the task mentions user manual, user documentation, handbook, tutorial, how-to, or adding screenshots to docs.
+description: Use when writing, restructuring or reviewing end-user documentation under docs/manual/, or any page that follows Diataxis (tutorials, how-to guides, reference, explanation), or when the task mentions user manual, user documentation, handbook, tutorial, how-to, or adding screenshots to docs.
 ---
 
 # Writing User Docs
 
 ## Overview
 
-End-user documentation lives in `docs/user-manual/` (standard 23, see the `bcc-standards` skill) and
+End-user documentation lives in `docs/manual/` (standard 23, see the `bcc-standards` skill) and
 follows Diataxis (standard 23, rule 11). The tree is **module first, documentation axis second**:
 the top folder level says which part of the app a page is about, and an optional level below it
 says what kind of page it is. A small module holds its pages directly.
@@ -31,7 +31,7 @@ page is about, usually a member, not a developer.
 ## Where Files Live
 
 ```
-docs/user-manual/
+docs/manual/
   getting-started/                module without axes: holds pages directly
     index.md                      module label + order
     welcome.md
@@ -112,7 +112,7 @@ the place to enforce them; if the repo has one, run it.
 
 ## Adding a Module
 
-1. Create `docs/user-manual/<module>/` with a lowercase, hyphenated slug.
+1. Create `docs/manual/<module>/` with a lowercase, hyphenated slug.
 2. Add `index.md` with the module's `title` and its `order` among the other modules.
 3. Add pages directly, or axis folders each with their own `index.md`.
 4. Add `images/` inside the module when it needs images.

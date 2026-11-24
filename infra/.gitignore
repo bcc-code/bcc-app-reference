@@ -1,0 +1,6 @@
+# Provider plugins and local state. .terraform.lock.hcl is committed.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.tf-plan

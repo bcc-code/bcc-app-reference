@@ -23,7 +23,7 @@ public sealed class ClientSeeder(IServiceProvider services, IConfiguration confi
             {
                 Permissions.Endpoints.Authorization, Permissions.Endpoints.Token, Permissions.Endpoints.EndSession,
                 Permissions.GrantTypes.AuthorizationCode, Permissions.ResponseTypes.Code,
-                Permissions.Scopes.Profile, Permissions.Scopes.Email,
+                Permissions.Scopes.Profile, Permissions.Scopes.Email, Permissions.Prefixes.Scope + "mfa",
             },
             Requirements = { Requirements.Features.ProofKeyForCodeExchange },
         };
@@ -36,5 +36,8 @@ public sealed class ClientSeeder(IServiceProvider services, IConfiguration confi
         await applications.CreateAsync(descriptor, cancellationToken);
     }
 
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
 }

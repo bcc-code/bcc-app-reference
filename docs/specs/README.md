@@ -15,5 +15,7 @@ agents (rule 9).
 Specs are explanation and design, in the Diátaxis sense. They are not how-to guides. Name files `YYYY-MM-DD-short-title.md` or
 number them, and state the status at the top: `Draft`, `Accepted`, `Superseded by ADR NNNN`.
 
-The template ships without specs. Plans and specs that an AI agent writes for itself (`docs/superpowers/`) may be kept, but
+The template ships without specs. A spec may be an event-model (Emlang or TEML YAML, with a short Markdown reading guide) when the
+design is about what happens in a process, for example bcc-ateam's `references-event-model.md`; keep the model and the guide together and
+state the status at the top like any other spec. Plans and specs that an AI agent writes for itself (`docs/superpowers/`) may be kept, but
 they do not replace ADRs.

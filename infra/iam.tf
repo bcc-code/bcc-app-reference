@@ -1,284 +1,37 @@
-# One service account per runtime and per caller (standard 03, rule 10). Account ids are limited to 30 characters; with
-# a long app slug shorten the "sa-<slug>-" prefix.
-
-# --- Runtimes ---------------------------------------------------------------------------------------------------------
-
 resource "google_service_account" "api" {
   account_id   = "sa-${local.app}-api-${local.env}"
-  display_name = "${local.app} api (${local.env})"
+  display_name = "${local.app}-api (${local.env})"
 }
 
-resource "google_service_account" "migrate" {
-  account_id   = "sa-${local.app}-migrate-${local.env}"
-  display_name = "${local.app} database migration job (${local.env})"
+# Created by the landing zone and bound to this repository's GitHub environment through Workload Identity Federation.
+data "google_service_account" "cicd" {
+  account_id = "sa-gha-cicd"
 }
 
+# The runtime account writes logs. Traces and metrics go to the BCC monitoring collector, which writes them to Cloud Trace
+# and Managed Prometheus with its own identity, so the account has no Cloud Trace or Monitoring role. Its access
+# to the shared database comes from the access group (database.tf), and its access to the Data Protection key, the
+# secrets and the messages topic is granted on those resources only (kms.tf, secrets.tf, pubsub.tf).
 locals {
-  # Project-level roles that have no resource-level form. Secret and KMS access is bound per resource in secrets.tf and kms.tf.
-  runtime_roles = {
-    api = [
-      "roles/cloudsql.client",       # connect through the Auth Proxy sidecar
-      "roles/cloudsql.instanceUser", # log in as an IAM database user
-      "roles/cloudtrace.agent",
-      "roles/logging.logWriter",
-      "roles/monitoring.metricWriter",
-    ]
-    migrate = [
-      "roles/cloudsql.client",
-      "roles/cloudsql.instanceUser",
-      "roles/logging.logWriter",
-    ]
-  }
-  runtime_service_accounts = {
-    api     = google_service_account.api
-    migrate = google_service_account.migrate
-  }
+  api_runtime_roles = [
+    "roles/logging.logWriter", # structured logs
+  ]
 }
 
-resource "google_project_iam_member" "runtime" {
-  for_each = merge([
-    for sa, roles in local.runtime_roles : {
-      for role in roles : "${sa}/${role}" => { email = local.runtime_service_accounts[sa].email, role = role }
-    }
-  ]...)
-  project = var.project_id
-  role    = each.value.role
-  member  = "serviceAccount:${each.value.email}"
+resource "google_project_iam_member" "api_runtime" {
+  for_each = toset(local.api_runtime_roles)
+  project  = local.project_id
+  role     = each.value
+  member   = "serviceAccount:${google_service_account.api.email}"
 }
 
-# --- GitHub Actions: Workload Identity Federation (no service account keys, standard 03 rule 9) ------------------------
-
-resource "google_iam_workload_identity_pool" "github" {
-  depends_on                = [google_project_service.services]
-  workload_identity_pool_id = "github"
-  display_name              = "GitHub Actions"
-}
-
-resource "google_iam_workload_identity_pool_provider" "github" {
-  workload_identity_pool_id          = google_iam_workload_identity_pool.github.workload_identity_pool_id
-  workload_identity_pool_provider_id = "github"
-  display_name                       = "GitHub OIDC"
-  attribute_mapping = {
-    "google.subject"        = "assertion.sub"
-    "attribute.repository"  = "assertion.repository"
-    "attribute.environment" = "assertion.environment"
-    "attribute.ref"         = "assertion.ref"
-    "attribute.event_name"  = "assertion.event_name"
-  }
-  # Tokens from any other repository are rejected before a service account binding is evaluated.
-  attribute_condition = "assertion.repository == \"${var.github_repository}\""
-  oidc {
-    issuer_uri = "https://token.actions.githubusercontent.com"
-  }
-}
-
-locals {
-  wif_pool = google_iam_workload_identity_pool.github.name
-}
-
-# Deploy: pushes the image, runs the migration job and rolls out a revision. Only jobs that run in the GitHub environment
-# named like this environment can use it. Set "deployment branches: main" and required reviewers on that environment,
-# otherwise a workflow file on any branch can claim the environment (docs/development.md, Repository settings).
-resource "google_service_account" "deploy" {
-  account_id   = "sa-${local.app}-deploy-${local.env}"
-  display_name = "${local.app} deploy from GitHub Actions (${local.env})"
-}
-
-# Terraform apply. Broad by nature (it creates the resources above), so it is reachable only from the GitHub
-# environment of this environment, which carries the approval rule.
-resource "google_service_account" "terraform" {
-  account_id   = "sa-${local.app}-tf-${local.env}"
-  display_name = "${local.app} terraform apply from GitHub Actions (${local.env})"
-}
-
-# Terraform plan on pull requests: read-only. PR workflows have no GitHub environment, so this account is bound to the
-# repository instead and must not be able to change anything.
-resource "google_service_account" "plan" {
-  account_id   = "sa-${local.app}-plan-${local.env}"
-  display_name = "${local.app} terraform plan from GitHub Actions (${local.env})"
-}
-
-resource "google_service_account_iam_member" "deploy_wif" {
-  service_account_id = google_service_account.deploy.name
-  role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${local.wif_pool}/attribute.environment/${local.env}"
-}
-
-resource "google_service_account_iam_member" "terraform_wif" {
-  service_account_id = google_service_account.terraform.name
-  role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${local.wif_pool}/attribute.environment/${local.env}"
-}
-
-resource "google_service_account_iam_member" "plan_wif" {
-  service_account_id = google_service_account.plan.name
-  role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${local.wif_pool}/attribute.repository/${var.github_repository}"
-}
-
-# Deploy account: act as the two runtime accounts only (never project-wide, standard 03 rule 13). Cloud Run checks
-# iam.serviceAccounts.actAs when the deploy changes a revision or executes the job.
-resource "google_service_account_iam_member" "deploy_acts_as_runtime" {
-  for_each           = local.runtime_service_accounts
-  service_account_id = each.value.name
+# Deploying a revision (gcloud run services update, and Terraform's own updates) is checked as actAs on the runtime
+# account. Granted on this account only, not project-wide (standard 03.13).
+resource "google_service_account_iam_member" "cicd_acts_as_runtime" {
+  service_account_id = google_service_account.api.name
   role               = "roles/iam.serviceAccountUser"
-  member             = local.deploy_sa_member
+  member             = "serviceAccount:${data.google_service_account.cicd.email}"
 }
 
-resource "google_project_iam_member" "deploy_service_usage" {
-  project = var.project_id
-  role    = "roles/serviceusage.serviceUsageConsumer" # gcloud calls APIs with this project as the quota project
-  member  = local.deploy_sa_member
-}
-
-resource "google_artifact_registry_repository_iam_member" "deploy_writer" {
-  repository = google_artifact_registry_repository.main.name
-  location   = google_artifact_registry_repository.main.location
-  role       = "roles/artifactregistry.writer"
-  member     = local.deploy_sa_member
-}
-
-# roles/run.developer on the two resources, not on the project: update the service image, update and execute the job.
-resource "google_cloud_run_v2_service_iam_member" "deploy_api" {
-  name     = google_cloud_run_v2_service.api.name
-  location = google_cloud_run_v2_service.api.location
-  role     = "roles/run.developer"
-  member   = local.deploy_sa_member
-}
-
-resource "google_cloud_run_v2_job_iam_member" "deploy_migrate" {
-  name     = google_cloud_run_v2_job.migrate.name
-  location = google_cloud_run_v2_job.migrate.location
-  role     = "roles/run.developer"
-  member   = local.deploy_sa_member
-}
-
-# objectUser, not objectAdmin: the upload adds objects and never needs to change bucket settings (standard 26 rule 11).
-resource "google_storage_bucket_iam_member" "deploy_assets" {
-  bucket = google_storage_bucket.assets.name
-  role   = "roles/storage.objectUser"
-  member = local.deploy_sa_member
-}
-
-# Terraform apply account. Each role is the admin role of a service this configuration manages. It cannot be narrower
-# without a custom role per resource type. Known risk: whoever can run a job in this environment can change anything
-# below, so keep required reviewers on the GitHub environment.
-resource "google_project_iam_member" "terraform" {
-  for_each = toset([
-    "roles/artifactregistry.admin",
-    "roles/cloudkms.admin",
-    "roles/cloudscheduler.admin",
-    "roles/cloudsql.admin",
-    "roles/iam.serviceAccountAdmin",
-    "roles/iam.workloadIdentityPoolAdmin",
-    "roles/logging.configWriter", # log-based metrics
-    "roles/monitoring.admin",
-    "roles/pubsub.admin",
-    "roles/resourcemanager.projectIamAdmin", # project-level bindings in this file
-    "roles/run.admin",
-    "roles/secretmanager.admin",
-    "roles/serviceusage.serviceUsageAdmin",
-    "roles/storage.admin",
-  ])
-  project = var.project_id
-  role    = each.value
-  member  = local.terraform_sa_member
-}
-
-# Terraform needs actAs on every account it attaches to a Cloud Run resource.
-resource "google_service_account_iam_member" "terraform_acts_as_runtime" {
-  for_each           = local.runtime_service_accounts
-  service_account_id = each.value.name
-  role               = "roles/iam.serviceAccountUser"
-  member             = local.terraform_sa_member
-}
-
-# State bucket: apply reads and writes, plan only reads. Plan runs with -lock=false because it must not write to the bucket.
-resource "google_storage_bucket_iam_member" "state_terraform" {
-  bucket = var.state_bucket
-  role   = "roles/storage.objectUser"
-  member = local.terraform_sa_member
-}
-
-resource "google_storage_bucket_iam_member" "state_plan" {
-  bucket = var.state_bucket
-  role   = "roles/storage.objectViewer"
-  member = local.plan_sa_member
-}
-
-# Plan reads every resource this configuration manages. Viewer does not cover all of them (for example IAM policies on
-# secrets); add the missing read permissions if a plan reports 403.
-resource "google_project_iam_member" "plan_viewer" {
-  project = var.project_id
-  role    = "roles/viewer"
-  member  = local.plan_sa_member
-}
-
-resource "google_project_iam_member" "plan_security_reviewer" {
-  project = var.project_id
-  role    = "roles/iam.securityReviewer"
-  member  = local.plan_sa_member
-}
-
-# --- Preview environments (sandbox only, standard 07) ---------------------------------------------------------------------
-
-# Previews run PR code, so this account is bound to its own GitHub environment "preview" (which has no branch restriction)
-# and exists in sandbox only. Anyone who can open a PR can run a job as it, so it gets no IAM administration: it cannot
-# create service accounts or change their policies, and it can act as one account only, the shared preview runtime account
-# below. It can still create and delete Cloud Run services and jobs in the sandbox project (run.admin), which holds
-# generated test data only (standard 07 rule 21).
-resource "google_service_account" "preview" {
-  count        = local.env == "sandbox" ? 1 : 0
-  account_id   = "sa-${local.app}-preview-${local.env}"
-  display_name = "${local.app} PR previews from GitHub Actions (${local.env})"
-}
-
-resource "google_service_account_iam_member" "preview_wif" {
-  count              = local.env == "sandbox" ? 1 : 0
-  service_account_id = google_service_account.preview[0].name
-  role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${local.wif_pool}/attribute.environment/preview"
-}
-
-resource "google_project_iam_member" "preview" {
-  for_each = local.env == "sandbox" ? toset([
-    "roles/run.admin", # create and delete the per-PR services and jobs
-    "roles/serviceusage.serviceUsageConsumer",
-  ]) : toset([])
-  project = var.project_id
-  role    = each.value
-  member  = "serviceAccount:${google_service_account.preview[0].email}"
-}
-
-# The identity every preview runs as. One shared account instead of one per PR: creating accounts per PR needs
-# iam.serviceAccountAdmin, which would let PR code change the IAM policy of every account in the project, the Terraform
-# accounts included. Give it only what the preview runtime needs; previews share it, so they must not hold secrets that
-# differ per PR.
-resource "google_service_account" "preview_runtime" {
-  count        = local.env == "sandbox" ? 1 : 0
-  account_id   = "sa-${local.app}-preview-run"
-  display_name = "${local.app} PR preview runtime (${local.env})"
-}
-
-# Acting as the preview runtime account only, granted on that account rather than on the project (standard 03 rule 13).
-resource "google_service_account_iam_member" "preview_acts_as_runtime" {
-  count              = local.env == "sandbox" ? 1 : 0
-  service_account_id = google_service_account.preview_runtime[0].name
-  role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${google_service_account.preview[0].email}"
-}
-
-resource "google_artifact_registry_repository_iam_member" "preview_writer" {
-  count      = local.env == "sandbox" ? 1 : 0
-  repository = google_artifact_registry_repository.main.name
-  location   = google_artifact_registry_repository.main.location
-  role       = "roles/artifactregistry.writer"
-  member     = "serviceAccount:${google_service_account.preview[0].email}"
-}
-
-resource "google_storage_bucket_iam_member" "state_preview" {
-  count  = local.env == "sandbox" ? 1 : 0
-  bucket = var.state_bucket
-  role   = "roles/storage.objectUser"
-  member = "serviceAccount:${google_service_account.preview[0].email}"
-}
+# deploy.yml pushes images as sa-gha-cicd (project role artifactregistry.writer from the landing zone), so the
+# repository needs no binding here.

@@ -1,88 +1,119 @@
 version: 2
-updates:
-  # The npm ecosystem also covers pnpm (it reads frontend/pnpm-lock.yaml). dependabot-guard.yml blocks package-lock.json.
-  - package-ecosystem: npm
-    directory: /frontend
-    schedule:
-      interval: weekly
-      day: monday
-      time: '06:00'
-      timezone: Europe/Berlin
-    open-pull-requests-limit: 15
-    # Matches minimumReleaseAge (10080 minutes = 7 days) and minimumReleaseAgeExclude in frontend/pnpm-workspace.yaml.
-    # Without it Dependabot opens PRs that pnpm then refuses to install.
-    cooldown:
-      default-days: 7
-      exclude:
-        - '@bcc-code/*'
-    commit-message:
-      prefix: chore
-      include: scope
-    labels:
-      - dependencies
-    groups:
-      patch-updates:
-        update-types: [patch]
-      minor-dev-deps:
-        dependency-type: development
-        update-types: [minor]
-      major-dev-deps:
-        dependency-type: development
-        update-types: [major]
 
+# Every ecosystem waits 7 days after a release (cooldown), the same quarantine as minimumReleaseAge in
+# frontend/pnpm-workspace.yaml. Without it Dependabot opens npm PRs that pnpm then refuses to install (standard 17.3).
+updates:
   - package-ecosystem: nuget
     directory: /
     schedule:
       interval: weekly
       day: monday
       time: '06:00'
-      timezone: Europe/Berlin
-    open-pull-requests-limit: 15
-    # A short quarantine for new releases. It is not tied to a package manager setting, as the pnpm one is.
+      timezone: Europe/Oslo
     cooldown:
-      default-days: 3
+      default-days: 7
+    open-pull-requests-limit: 10
     commit-message:
       prefix: chore
       include: scope
-    labels:
-      - dependencies
     groups:
+      # One Wolverine version across all WolverineFx packages.
+      critter-stack:
+        patterns: ['WolverineFx*']
+      # Aspire.Hosting.* and the aspire.cli tool (.config/dotnet-tools.json) move together. The Aspire.AppHost.Sdk version
+      # in api/AppHost/AppHost.csproj must be raised by hand to the same version.
+      aspire:
+        patterns: ['Aspire*', 'aspire*']
+      opentelemetry:
+        patterns: ['OpenTelemetry*']
       minor-and-patch:
         patterns: ['*']
         update-types: [minor, patch]
 
-  # Keeps the SHA pins of actions and reusable workflows current (standard 05 rule 12).
-  - package-ecosystem: github-actions
-    directory: /
+  - package-ecosystem: npm
+    directory: /frontend
     schedule:
       interval: weekly
       day: monday
       time: '06:00'
-      timezone: Europe/Berlin
+      timezone: Europe/Oslo
+    # Matches minimumReleaseAge and minimumReleaseAgeExclude in frontend/pnpm-workspace.yaml.
     cooldown:
-      default-days: 3
+      default-days: 7
+      exclude: ['@bcc-code/*']
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore
+      include: scope
+    ignore:
+      # The major version follows the Node version in .github/actions/setup/action.yml (node-version), together with
+      # engines in frontend/package.json and @tsconfig/node<major>. Raise them by hand in one PR.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+      # TypeScript 7 (the native compiler) drops the JS compiler API that typescript-eslint, vue-tsc and @hey-api/openapi-ts
+      # use, so its major breaks lint, type-check and client generation. Move by hand once those tools support it.
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
+    groups:
+      bcc:
+        patterns: ['@bcc-code/*']
+      production-minor-and-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+      development-minor-and-patch:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    # The composite setup action holds pins too.
+    directories: [/, /.github/actions/*]
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Oslo
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: ci
       include: scope
-    labels:
-      - dependencies
-      - github-actions
     groups:
       github-actions:
         patterns: ['*']
 
-  # Provider versions. The gateway modules are pinned by commit SHA and are updated by hand (infra/gateway_backend.tf).
-  - package-ecosystem: terraform
-    directories:
-      - /infra
-      - /infra/preview
+  # The Structurizr images (docs/architecture/Dockerfile). Both stages are one release, so they come in one PR. A new
+  # export image fails the `architecture` check until docs/architecture/export.sh is run and the SVGs are committed.
+  - package-ecosystem: docker
+    directory: /docs/architecture
     schedule:
       interval: weekly
       day: monday
       time: '06:00'
-      timezone: Europe/Berlin
+      timezone: Europe/Oslo
     cooldown:
-      default-days: 3
+      default-days: 7
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      structurizr:
+        patterns: ['structurizr/*']
+
+  # Provider versions (.terraform.lock.hcl is updated with them; regenerate it for all platforms, see infra/README.md). The
+  # gateway modules are git sources pinned by commit SHA (infra/gateway_backend.tf); Dependabot may not move those, so raise
+  # the pins by hand through a PR.
+  - package-ecosystem: terraform
+    directories:
+      - /infra
+      - /infra/preview
+      - /infra/preview-shared
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Oslo
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: chore
       include: scope

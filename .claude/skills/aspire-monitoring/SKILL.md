@@ -9,9 +9,9 @@ description: >-
   browser logs in dashboard, terminal view, DevTunnel URLs, WithBrowserLogs, App Insights
   query, AKS pod logs, container app logs.
   DO NOT USE FOR: start/stop/wait (use aspire-orchestration), deploy/publish/destroy (use
-  aspire-deployment), AppHost code edits like WithBrowserLogs() (see aspire/references/csharp-apphosts.md), Azure
+  aspire-deployment), AppHost code edits like WithBrowserLogs() (use aspireify), Azure
   provisioning (use azure-prepare).
-  INVOKES: aspire CLI, kubectl + Container Insights.
+  INVOKES: aspire CLI, azure-diagnostics (deployed Azure), kubectl + Container Insights.
   FOR SINGLE OPERATIONS: Run the aspire CLI command directly for quick log or describe lookups.
 license: MIT
 metadata:
@@ -20,8 +20,6 @@ metadata:
 ---
 
 # Aspire Monitoring
-
-> **This repo:** deployed environments run on GCP (Cloud Run), so the Azure rows and the `azure-diagnostics` skill below do not apply. Local diagnostics with the Aspire CLI apply as written. For deployed apps use Cloud Logging and `docs/runbooks/`.
 
 > Aspire CLI provides full observability **locally**. For deployed apps, route to platform-specific tools.
 
@@ -184,7 +182,7 @@ resource's browser diagnostics.
 | Inspect existing browser diagnostics | Discover `<frontend>-browser-logs`, start `open-tracked-browser`, then run `aspire logs <frontend>-browser-logs` |
 | Confirm the browser resource belongs to a frontend | Check the child resource's parent relationship and `Source` property |
 | Confirm a frontend has browser logging enabled | Check the AppHost for `.WithBrowserLogs()` on the resource |
-| Add `WithBrowserLogs()` to a resource | → [csharp-apphosts](../aspire/references/csharp-apphosts.md) (AppHost authoring) — do not edit the AppHost from this skill |
+| Add `WithBrowserLogs()` to a resource | → **`aspireify` skill** (AppHost authoring) — do not edit the AppHost from this skill |
 
 ## Dashboard UX Features
 
@@ -203,7 +201,7 @@ Agents inspecting a running dashboard should know:
   automatically. Use its in-editor dashboard or configure `dashboardBrowser` /
   `launch.json`.
 
-> Authoring custom commands or `WithBrowserLogs()` calls is AppHost work — see [csharp-apphosts](../aspire/references/csharp-apphosts.md). This skill is for *observing* what those features surface in the dashboard.
+> Authoring custom commands or `WithBrowserLogs()` calls is AppHost work — route to **`aspireify`**. This skill is for *observing* what those features surface in the dashboard.
 
 ## Why Aspire CLI Can't Do Remote Diagnostics
 
@@ -217,10 +215,15 @@ The Aspire CLI talks to a *running AppHost* through a local backchannel socket a
 |----------|----------|
 | Start/stop/wait/rebuild lifecycle | → `aspire-orchestration` skill |
 | Deploy, publish, pipeline steps, AppHost compute environment binding | → `aspire-deployment` skill |
-| AppHost code changes (`WithBrowserLogs()`, custom commands, `WithHttpCommand`) | → [csharp-apphosts](../aspire/references/csharp-apphosts.md) |
-| Deployed app health on GCP | Cloud Logging, Cloud Monitoring and `docs/runbooks/` (not covered by this skill) |
+| AppHost code changes (`WithBrowserLogs()`, custom commands, `WithHttpCommand`) | → `aspireify` skill |
+| Deployed Azure resource health (App Insights, Front Door, NSP, private endpoint, ACA, App Service) | → `azure-diagnostics` skill (azure-skills) |
 | AKS workload diagnostics (pod logs, pod state, Container Insights) | → `kubectl` + Azure Monitor Container Insights |
 | Docker / Compose container logs | → `docker logs` / `docker compose logs` |
+
+## Project-Local Skill Routing
+
+If `.agents/skills/aspire/SKILL.md` exists (from `aspire agent init`), see its
+`references/monitoring.md` for deeper telemetry workflow guidance.
 
 ## References
 

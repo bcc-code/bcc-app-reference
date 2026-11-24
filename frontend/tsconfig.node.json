@@ -1,11 +1,13 @@
 {
   "extends": "@tsconfig/node24/tsconfig.json",
-  "include": ["vite.config.*", "eslint.config.*", "knip.config.*", "openapi-ts.config.*", "playwright.config.*", "e2e/**/*"],
+  "include": ["vite.config.*", "eslint.config.*", "knip.config.*", "openapi-ts.config.*"],
   "compilerOptions": {
     "module": "preserve",
     "moduleResolution": "bundler",
     "types": ["node"],
     "noEmit": true,
+    // Without `incremental`, `vue-tsc --build` keeps no per-file state and checks every file again on each run.
+    "incremental": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
   }
 }

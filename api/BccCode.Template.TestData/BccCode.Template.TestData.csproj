@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>BccCode.Template.TestData</RootNamespace>
+    <UserSecretsId>bcc-template-testdata</UserSecretsId>
+    <IsPackable>false</IsPackable>
+    <ContainerRepository>bcc-template-testdata</ContainerRepository>
+    <!-- ICU and tzdata. .NET 11 images are Ubuntu 26.04 "resolute"; there are no noble images. -->
+    <ContainerFamily>resolute-chiseled-extra</ContainerFamily>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Npgsql" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ServiceDefaults\ServiceDefaults.csproj" />
+    <ProjectReference Include="..\BccCode.Template\BccCode.Template.csproj" />
+  </ItemGroup>
+  <!-- The personas are compiled in from the OIDC mock instead of referenced: its OpenIddict packages must not flow into the seeder
+       image. The person uids are written once, there. -->
+  <ItemGroup>
+    <Compile Include="..\OidcMock\Personas.cs" Link="Personas.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BccCode.Template.Tests" />
+    <InternalsVisibleTo Include="BccCode.Template.IntegrationTests" />
+  </ItemGroup>
+</Project>

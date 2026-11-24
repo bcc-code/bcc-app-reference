@@ -101,7 +101,8 @@ The scripts name each PNG `<area>-<state>.png`, and both sides use the same name
 
 ### 6. Create the PR
 
-Generate the title and body from the branch's commits and diff. If `.github/PULL_REQUEST_TEMPLATE.md` exists, follow it; otherwise use descriptive, multi-paragraph prose without a rigid template:
+Generate the title and body from the branch's commits and diff. Follow `.github/pull_request_template.md`: the headings are
+Summary, Changes, Review notes, Testing and Privacy. The title is an imperative sentence without a type prefix, like a commit subject.
 
 ```bash
 git log --format='%s%n%n%b' "$BASE"..HEAD
@@ -110,9 +111,12 @@ git diff --stat "$BASE"...HEAD
 
 Write the body to `$OUT/pr-body.md`. Structure:
 
-- A short summary paragraph of what the PR does and why (fold in any extra context argument).
-- A "## Changes" bullet list of the notable changes.
-- If the change adds or changes how personal data is processed, a "## Privacy" section: what data, why, where stored, retention, who sees it (standard 18, rule 3).
+- `## Summary`: what the PR does and why, with the issue or ClickUp task linked (fold in any extra context argument).
+- `## Changes`: the notable changes, by area.
+- `## Review notes`: what a reviewer should look at first, decisions that could go the other way, and what was left out on purpose.
+- `## Testing`: the tests added or changed and the manual checks.
+- `## Privacy`: when the change adds or changes how personal data is processed, say what data, why, where stored, retention, who sees it
+  (standard 18, rule 3) and update `docs/data-protection/data-inventory.md`. Otherwise write "No change".
 - If screenshots were captured, a "## Screenshots" section with a before/after table per route. Write the image URLs as `PLACEHOLDER-<slug>-before` / `PLACEHOLDER-<slug>-after` for now; step 6b swaps in the real ones:
 
   ```markdown

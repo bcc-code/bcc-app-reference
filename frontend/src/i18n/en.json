@@ -8,11 +8,6 @@
     "notes": "Notes",
     "stats": "Statistics"
   },
-  "user": {
-    "menu": "{name}, account menu",
-    "signedInAs": "Signed in as {name}",
-    "logout": "Sign out"
-  },
   "common": {
     "loading": "Loading…",
     "back": "Back to notes"
@@ -57,7 +52,7 @@
     "notFound": "We could not find what you asked for.",
     "conflict": "Someone else changed this at the same time. Load the latest version and try again.",
     "validation": "Some of the values are not valid.",
-    "csrf": "The page was open for too long. Reload it and try again.",
+    "mfaRequired": "Sign in again with a second factor.",
     "tooManyRequests": "Too many requests. Wait a moment and try again.",
     "unexpected": "Something went wrong. Try again.",
     "note": {
@@ -65,6 +60,20 @@
       "titleRequired": "Enter a title.",
       "titleTooLong": "The title can be at most 200 characters.",
       "bodyTooLong": "The text can be at most 10 000 characters."
+    }
+  },
+  "layout": {
+    "language": "Language"
+  },
+  "users": {
+    "signOut": "Sign out"
+  },
+  "form": {
+    "alerts": {
+      "required": "This field is required.",
+      "checkField": "Please check this field.",
+      "maxLength200": "This field must not exceed 200 characters.",
+      "maxLength10000": "This field must not exceed 10 000 characters."
     }
   }
 }

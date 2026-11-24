@@ -74,7 +74,7 @@ Keep these points in mind:
   resource is unavailable.
 - `aspire otel logs <frontend>` does **not** return browser diagnostics. Use
   `aspire logs <frontend>-browser-logs` instead.
-- Adding or configuring `WithBrowserLogs()` is AppHost authoring; see `aspire/references/csharp-apphosts.md`.
+- Adding or configuring `WithBrowserLogs()` is AppHost authoring; route that work to `aspireify`.
 
 ## Filtering
 
@@ -243,7 +243,7 @@ belongs to. Do not claim that `aspire otel logs <frontend>` returns this browser
 expected browser child resource is unavailable from normal `aspire describe` or `aspire resources`
 output, then retry discovery with `aspire describe --include-hidden`.
 
-Adding or configuring `WithBrowserLogs()` remains AppHost authoring and is covered in `aspire/references/csharp-apphosts.md`.
+Adding or configuring `WithBrowserLogs()` remains AppHost authoring and routes to `aspireify`.
 
 ## Why Aspire CLI Can't Do Remote Diagnostics
 

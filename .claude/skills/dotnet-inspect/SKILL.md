@@ -1,7 +1,6 @@
 ---
 name: dotnet-inspect
 description: Find evidence for .NET packages, platform libraries, assemblies, APIs, dependencies, SourceLink/source, and API version diffs.
-allowed-tools: Bash(dnx dotnet-inspect:*)
 ---
 
 # dotnet-inspect

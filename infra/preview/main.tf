@@ -1,89 +1,55 @@
-# Per-PR preview environment (standard 07). Applied by .github/workflows/preview.yml into workspace pr<N>.
-#
-# This is a starting point and does not yet describe a complete preview. TODO for the project that adopts it:
-#   - a database on the shared preview Cloud SQL instance (one database and user per PR, standard 07 rules 6 and 20);
-#   - a Cloud Run job that runs the migrations, executed after every apply;
-#   - the OIDC mock service that the API logs in through (var.oidc_mock_image);
-#   - the Auth Proxy sidecar and the connection string, as in ../cloudrun_api.tf.
-#   - messaging: the Pub/Sub topic, push subscription and durability pass job of ../pubsub.tf and ../scheduler.tf, with the
-#     Messaging__* and Internal__* settings of ../cloudrun_api.tf. The preview has no database, so it has no outbox either.
-# Every resource is named <app>-<thing>-pr<N> and labelled with the PR, so a stray resource can be traced to its PR.
-
 locals {
-  slug = "pr${var.pr_number}"
+  props      = merge(jsondecode(var.props), jsondecode(var.deployment_props))
+  project_id = local.props.gcp.project_id
+  region     = local.props.gcp.location
+
+  # The platform workflow derives the workspace from the component name, so it is what keeps one preview's state and
+  # resource names apart from another's. For PR 1234 it is "pr1234".
+  slug = local.props.component_name
+
+  # Same app name as infra/, so resource names follow one scheme (init-app.ps1 replaces it in both).
+  app = "bcc-template"
+
+  api_service      = "${local.app}-api-${local.slug}"
+  oidcmock_service = "${local.app}-oidc-${local.slug}"
+
+  # Cloud Run's stable URL form is known before the services exist, so the API and the mock can name each other
+  # without a dependency cycle.
+  api_url  = "https://${local.api_service}-${data.google_project.main.number}.${local.region}.run.app"
+  oidc_url = "https://${local.oidcmock_service}-${data.google_project.main.number}.${local.region}.run.app"
+
+  # Lets the platform find a stray resource and the PR it belongs to.
   labels = {
-    app = "template"
-    pr  = var.pr_number
+    template-preview = "true"
+    template-pr      = var.pr_number
   }
+
+  # Cloud SQL Auth Proxy sidecar, the same image as infra/cloudrun_api.tf (keep the two in step).
+  sql_proxy_image = "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.26.2@sha256:e8c76356fb586300c63f0d29c8c75cfeeba33c29736f9d4afa2df2d78cd0fa19"
 }
 
 provider "google" {
-  project = var.project_id
-  region  = var.region
+  project               = local.project_id
+  region                = local.region
+  billing_project       = local.project_id
+  user_project_override = true
 }
 
-# Created once by ../iam.tf (preview_runtime). The preview workflow may act as this account and no other, so a preview cannot
-# run as the sandbox API or the Terraform accounts.
-data "google_service_account" "runtime" {
-  account_id = "sa-template-preview-run"
+data "google_project" "main" {}
+
+# The shared part (infra/preview-shared) is looked up by name, not through its state, so a preview apply cannot lock or
+# change that state.
+data "google_kms_key_ring" "shared" {
+  name     = "${local.app}-${local.props.app_environment}"
+  location = local.region
 }
 
-resource "google_cloud_run_v2_service" "api" {
-  name                = "template-api-${local.slug}"
-  location            = var.region
-  labels              = local.labels
-  deletion_protection = false # throwaway: the whole workspace is destroyed with the PR
-
-  # TODO: previews should not be publicly reachable (standard 07 rule 19). Put them behind IAP or Cloud Armor, or at least
-  # require the app login on every route. INGRESS_TRAFFIC_ALL is the value that works without the gateway.
-  ingress = "INGRESS_TRAFFIC_ALL"
-
-  template {
-    service_account = data.google_service_account.runtime.email
-    labels          = local.labels
-    scaling {
-      min_instance_count = 0 # previews scale to zero (standard 07 rule 9)
-      max_instance_count = 2
-    }
-    containers {
-      name  = "app"
-      image = var.api_image
-      # preview.yml bakes the built frontend into wwwroot; see ../cloudrun_api.tf.
-      env {
-        name  = "Frontend__StaticPath"
-        value = "/app/wwwroot"
-      }
-      ports {
-        container_port = 8080
-      }
-      resources {
-        cpu_idle          = true
-        startup_cpu_boost = true
-        limits            = { cpu = "1000m", memory = "512Mi" }
-      }
-      startup_probe {
-        tcp_socket {
-          port = 8080
-        }
-        timeout_seconds   = 240
-        period_seconds    = 240
-        failure_threshold = 1
-      }
-      liveness_probe {
-        http_get {
-          path = "/alive"
-          port = 8080
-        }
-      }
-    }
-  }
+data "google_kms_crypto_key" "data_protection" {
+  name     = "data-protection"
+  key_ring = data.google_kms_key_ring.shared.id
 }
 
-# The preview has its own login (the OIDC mock) and holds generated test data only, so the service itself is open and the
-# app enforces login. This is why previews must never receive production or personal data.
-resource "google_cloud_run_v2_service_iam_member" "invoker" {
-  name     = google_cloud_run_v2_service.api.name
-  location = google_cloud_run_v2_service.api.location
-  role     = "roles/run.invoker"
-  member   = "allUsers"
+# Created by the landing zone; the same account that applies this root.
+data "google_service_account" "cicd" {
+  account_id = "sa-gha-cicd"
 }

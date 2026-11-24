@@ -28,6 +28,16 @@ function typeKey(type: unknown): string | undefined {
   return isKey(key) ? key : undefined
 }
 
+/**
+ * A 403 and a 404 have no body (standard 09.10), so the generated client throws an empty object and the status is lost. The
+ * client's error interceptor (main.ts) puts the status of the response on whatever it threw, so the rest of the SPA can tell them apart.
+ */
+export function withStatus(error: unknown, response?: Response): unknown {
+  if (!response) return error
+  const body = bodyOf(error)
+  return typeof body.status === 'number' ? error : { ...body, status: response.status }
+}
+
 /** The i18n keys to show for a failed request, each once. Never empty. */
 export function problemKeys(error: unknown): string[] {
   const body = bodyOf(error)
@@ -37,6 +47,8 @@ export function problemKeys(error: unknown): string[] {
   const fromType = typeKey(body.type)
   if (fromType) return [fromType]
   if (body.status === 409) return ['errors.conflict']
+  if (body.status === 403) return ['errors.forbidden']
+  if (body.status === 404) return ['errors.notFound']
   return ['errors.unexpected']
 }
 

@@ -1,0 +1,89 @@
+name: Build images
+
+# Builds the container images of a commit for a preview (ADR 0027). It runs untrusted PR code, so it has read-only
+# permissions, no secrets and no credentials left in the checkout. Pushing the images is the caller's job.
+on:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+        description: The commit to build.
+      tag:
+        type: string
+        required: true
+        description: The tag of every image.
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          frontend: 'true'
+      - run: pnpm --dir frontend build
+      # Same image as deploy.yml: the API serves index.html and the other root files from the image (Static mode).
+      - name: Bake the frontend into the image
+        run: mkdir -p api/BccCode.Template.Api/wwwroot && cp -r frontend/dist/. api/BccCode.Template.Api/wwwroot/
+      # Production runs the pre-generated Wolverine code (ADR 0012).
+      - name: Pre-generate Wolverine code
+        run: dotnet run --project api/BccCode.Template.Api -c Release -- jasper codegen write
+      - name: Publish the API image
+        env:
+          ARCHIVE: ${{ runner.temp }}/api.tar
+        run: >
+          dotnet publish api/BccCode.Template.Api -c Release /t:PublishContainer
+          -p:ContainerImageTags='"'"$TAG"'"'
+          -p:ContainerArchiveOutputPath="$ARCHIVE"
+      - name: Publish the OIDC mock image
+        env:
+          ARCHIVE: ${{ runner.temp }}/oidcmock.tar
+        run: >
+          dotnet publish api/OidcMock -c Release /t:PublishContainer
+          -p:ContainerImageTags='"'"$TAG"'"'
+          -p:ContainerArchiveOutputPath="$ARCHIVE"
+      - name: Publish the seeder image
+        env:
+          ARCHIVE: ${{ runner.temp }}/testdata.tar
+        run: >
+          dotnet publish api/BccCode.Template.TestData -c Release /t:PublishContainer
+          -p:ContainerImageTags='"'"$TAG"'"'
+          -p:ContainerArchiveOutputPath="$ARCHIVE"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: api
+          path: ${{ runner.temp }}/api.tar
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: assets
+          path: frontend/dist/assets
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: oidcmock
+          path: ${{ runner.temp }}/oidcmock.tar
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: testdata
+          path: ${{ runner.temp }}/testdata.tar
+          if-no-files-found: error
+          retention-days: 7

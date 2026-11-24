@@ -2,7 +2,9 @@ bin/
 obj/
 .vs/
 .idea/
+.vscode/
 *.user
+*.suo
 TestResults/
 node_modules/
 frontend/dist/
@@ -21,3 +23,6 @@ frontend/dist/
 .playwright-mcp/
 .playwright-cli/
 .superpowers/
+
+# The built frontend copied in for publish is build output
+api/*/wwwroot/

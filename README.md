@@ -1,56 +1,56 @@
 # BCC App Template
 
-A repository template for new BCC applications: .NET 10, Wolverine.HTTP, Aspire, Postgres, Vue 3, Terraform on GCP. It
-follows the BCC Software Development Standards and is built from the practices that worked best in orginn, bcc-privacy and
-bcc-vote.
-
-It contains two sample apps with the same HTTP contract and frontend, differing only in persistence:
-
-| Variant | Project | Use when |
-|---|---|---|
-| Marten | `api/BccCode.Template.Api.Marten` | The domain benefits from event sourcing or documents (history, audit, projections). |
-| EF Core | `api/BccCode.Template.Api.EfCore` | The domain is relational or reporting-heavy. |
-
-See [ADR 0003](docs/adrs/0003-marten-or-ef-core.md).
+A repository template for new BCC applications: .NET 11, Wolverine.HTTP, EF Core on Postgres, Aspire, Vue 3, Terraform on GCP. It
+follows the BCC Software Development Standards and is built from the practices of the BCC A-team application and of orginn,
+bcc-privacy and bcc-vote. One sample app, personal notes, shows every layer end to end.
 
 ## What is included
 
-- **Local environment**: `aspire run` starts Postgres, the schema step, seed data, a mock OIDC provider with test personas,
-  the API and the Vite dev server behind one HTTPS origin. `--isolated` for worktrees.
-- **Security**: BFF authentication (opaque cookie, server-side sessions, PKCE, PAR, back-channel logout), default-deny
-  authorization with an anonymous-route allowlist, CSRF for JSON APIs, security headers and nonce CSP, rate limiting.
-- **Sample feature**: personal notes as vertical slices with value types, ProblemDetails, optimistic concurrency and
-  ownership checks.
-- **Quality guards**: warnings as errors, central package management with lock files, architecture tests with a
-  forbidden-API scanner, endpoint policy sweep, OpenAPI drift checks, i18n completeness, axe in E2E tests.
-- **CI/CD**: path-aware PR workflow, CodeQL, gitleaks, SBOM, Dependabot with cooldown, build-once-and-promote deploys,
-  preview environments, Terraform plan/apply. All actions pinned to SHAs.
-- **Infrastructure**: Terraform for Cloud Run, Cloud SQL, migration job, IAM per caller, Workload Identity Federation, KMS,
-  monitoring alerts with runbooks.
+- **Local environment**: `aspire run` starts Postgres, the schema step, a seeder, a mock OIDC provider with test personas, the API
+  and the Vite dev server behind one HTTPS origin, and a C4 diagram viewer. `--isolated` for worktrees.
+- **Security**: BFF authentication (opaque cookie, server-side sessions, PKCE, back-channel logout, a second factor for administrators),
+  default-deny authorization with an anonymous-route allowlist and a `Permission` step per endpoint, cross-origin protection instead of
+  CSRF tokens, security headers and nonce CSP.
+- **Sample feature**: personal notes as vertical slices with value types, typed ProblemDetails, optimistic concurrency, ownership checks
+  (403 and 404) and soft removal (archiving). An audit trail and history are not part of the template yet.
+- **Quality guards**: warnings as errors, banned APIs at compile time, central package management with lock files, architecture tests,
+  endpoint policy sweep, OpenAPI and client drift checks, i18n completeness, axe in the E2E tests.
+- **CI/CD**: one `ci` check (backend, integration, E2E on the AppHost, codegen and image, contracts, frontend, infra, C4, gitleaks,
+  Semgrep), build-once deploys through the BCC landing zone, PR previews, Dependabot with cooldown. Actions are pinned to SHAs.
+- **Infrastructure**: Terraform for Cloud Run behind the platform gateway, shared Cloud SQL with IAM authentication, Pub/Sub, KMS,
+  telemetry to the BCC collector, monitoring alerts with runbooks.
 - **Docs**: ADRs, C4 diagrams, runbooks, data inventory, tech-debt folder, Diátaxis stubs.
-- **Agent tooling**: `AGENTS.md`, the `bcc-standards` skill and `standards-reviewer` agent, Aspire MCP, and skills for
-  Aspire, screenshots, PRs, permission tests, user docs and ClickUp.
+- **Agent tooling**: `AGENTS.md`, the `bcc-standards` skill and `standards-reviewer` agent, Aspire MCP and skills for Aspire,
+  Wolverine, relational slices, screenshots, PRs, permission tests, user docs and ClickUp.
 
 ## Create a new app
 
 1. On GitHub, choose **Use this template** and create the repository.
-2. Clone it and run the init script (PowerShell 7):
+2. Clone it and run the init script (PowerShell 7). Pick a port base whose 100 ports no other BCC app on your machine uses
+   (the template uses 16000):
 
    ```bash
-   pwsh scripts/init-app.ps1 -Name MyApp -Persistence marten -WhatIf   # preview
-   pwsh scripts/init-app.ps1 -Name MyApp -Persistence marten
+   pwsh scripts/init-app.ps1 -Name MyApp -PortBase 17000 -WhatIf   # preview
+   pwsh scripts/init-app.ps1 -Name MyApp -PortBase 17000
    ```
 
-   It deletes the other variant, renames `BccCode.Template` to `BccCode.MyApp` and `template` to `myapp`, and prints the
-   remaining steps (regenerate lock files, OpenAPI and client, run the tests).
-3. Fill in the project-specific values: `infra/*.tfvars`, GitHub environments and variables (`infra/README.md`), the
-   `CODEOWNERS` team, and the Config section of the ClickUp skills.
-4. Set up the repository settings listed in [docs/development.md](docs/development.md#repository-settings).
-5. Replace the Notes sample with the first real feature, and review `docs/privacy/data-inventory.md`.
+   It renames `BccCode.Template` to `BccCode.MyApp` and `template` to `myapp`, moves the ports, and prints the remaining steps
+   (regenerate lock files, the OpenAPI document and the client, run the tests).
+3. Provision the project with `provision-project.yml` and follow the [first-deploy runbook](docs/runbooks/first-deploy.md); fill in the
+   project-specific values in `infra/` and the Config section of the ClickUp skills, and set the `CODEOWNERS` team.
+4. Set up the repository settings in [docs/development/repository-settings.md](docs/development/repository-settings.md).
+5. Replace the Notes sample with the first real feature (`Notes/` is the pattern: an entity with `version`, one file per endpoint, a configuration class), and review
+   [the data inventory](docs/data-protection/data-inventory.md).
 
-## Develop
+## Prerequisites
 
-See [AGENTS.md](AGENTS.md) for commands, rules and gotchas, and [docs/development.md](docs/development.md) for details.
+- .NET SDK 11.0.100 (`global.json`)
+- Docker
+- Node 24 and pnpm 12.17.0 (pnpm downloads the pinned version through `devEngines`)
+- A trusted development certificate: `dotnet dev-certs https --trust`
+- PowerShell 7 for `scripts/init-app.ps1`
+
+## Run
 
 ```bash
 dotnet tool restore
@@ -58,7 +58,26 @@ pnpm --dir frontend install
 aspire run
 ```
 
+With the template's port base:
+
+| What | URL |
+|---|---|
+| Aspire dashboard | https://localhost:16050 |
+| The app | https://template.dev.localhost:16000 |
+| Persona picker (sign-in) | https://localhost:16020/login |
+| Database UI (DBX) | http://localhost:16011 |
+| C4 diagrams | http://localhost:16060/workspace/1/diagrams |
+
+Sign in by picking a persona: `user`, `user2`, `admin` or `admin-no-mfa` ([personas](docs/development/personas.md)). In a git
+worktree or a second checkout start with `aspire run --isolated`; `aspire describe` prints the real URLs
+([isolated mode](docs/development/isolated-mode.md)).
+
+## Develop
+
+See [AGENTS.md](AGENTS.md) for commands, rules and gotchas, and [docs/development](docs/development/README.md) for the details by
+task. Decisions are in [docs/adrs](docs/adrs/README.md).
+
 ## Status
 
-The rules and much of the code were drafted with AI assistance from the source repositories and the standards. Review the
-code, the Terraform and especially the privacy and security documents before relying on them in production.
+The rules and much of the code were drafted with AI assistance from the source repositories and the standards. Review the code, the
+Terraform and especially the privacy and security documents before relying on them in production.

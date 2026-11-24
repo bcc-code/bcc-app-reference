@@ -1,17 +1,17 @@
 name: Deploy
+run-name: Deploy - ${{ github.event.workflow_run.display_title || inputs.sha || 'head of main' }}
 
-# Build once, promote the same image digest (standard 06):
-#   CI green on main -> Terraform (sandbox) -> build and push the image -> migrations -> sandbox rollout -> smoke test
-#   -> [GitHub environment "prod": required reviewers] -> copy the digest to the prod registry -> migrations -> rollout
-#   -> smoke test -> git tag and GitHub release with SBOM.
-#
-# Prod infrastructure is applied from infra.yml (manual dispatch, same approval rule). Apply it before promoting a
-# release that changes infra/. Rollback: docs/runbooks/rollback.md.
+# Build once, then promote the same image digest (standard 06.3). One run: build, apply Terraform, push the image to
+# sandbox, upload the assets, apply the schema, roll out by digest, smoke test; then, after approval of the `prod`
+# environment, the same image goes to prod. See ADR 0014.
 on:
+  # Runs when the CI workflow (ci.yml) has finished on main. The gate job only proceeds when it succeeded for a push, so
+  # the exact commit has passed CI (standard 06.2).
   workflow_run:
     workflows: [CI]
     types: [completed]
     branches: [main]
+  # Deploys a commit on main that has a green CI workflow run (see `gate`).
   workflow_dispatch:
     inputs:
       sha:
@@ -22,34 +22,38 @@ on:
 permissions:
   contents: read
 
+# Concurrency is set per job, not for the workflow. The `terraform` and `deploy-sandbox` jobs share the group deploy-sandbox with
+# infra.yml, so Terraform and the deploy never run at the same time for sandbox (standard 06.10). A running job is not
+# cancelled, since a cancelled apply can leave the state locked. GitHub keeps only one pending job per group, so a job still
+# waiting is replaced by a newer one; it never started, so no lock is left behind. `deploy-prod` has its own group (deploy-prod,
+# the one infra.yml uses for prod): a prod approval that is still pending then does not block later sandbox deploys or
+# infra.yml runs for sandbox.
+
 env:
-  CI: 'true' # NuGet locked-mode restore and the pnpm supply-chain policy
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
-  # The API project that is built into the image. In the template it is the Marten one; scripts/init-app.ps1 rewrites it (template:init-note).
-  # For the EF Core variant it is api/BccCode.Template.Api.EfCore, and infra/variables.tf migrate_args is ["migrate"] (template:init-note).
-  API_PROJECT: api/BccCode.Template.Api.Marten
-  IMAGE_NAME: template-api
 
 jobs:
-  # Deploys depend on green tests for the exact commit being deployed (standard 06 rule 2).
+  # Picks the commit to deploy and refuses one without a green CI workflow.
   gate:
+    # A fork can have a branch called main, so a workflow_run must come from a push.
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # A fork can have a branch called main, so require a push-triggered CI run as well.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     permissions:
       contents: read
-      actions: read
+      actions: read # list the CI workflow runs of a commit
     outputs:
       sha: ${{ steps.sha.outputs.sha }}
+      is_tip: ${{ steps.sha.outputs.is_tip }}
+      deploy: ${{ steps.changes.outputs.deploy }}
     steps:
       - id: sha
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT: ${{ github.event_name }}
+          # For workflow_run, github.sha is the tip of main, not the commit CI ran on.
           RUN_SHA: ${{ github.event.workflow_run.head_sha }}
           INPUT_SHA: ${{ inputs.sha }}
         run: |
@@ -59,42 +63,51 @@ jobs:
           else
             sha="${INPUT_SHA:-$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)}"
             if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then echo "::error::sha must be a full commit id"; exit 1; fi
-            # The commit must be on main, and CI must have passed on it.
+            # A manual run does not pass through workflow_run, so check here that the commit is on main and that its CI
+            # workflow run on main succeeded: a green run on a branch is not a reviewed commit.
             status=$(gh api "repos/$GITHUB_REPOSITORY/compare/main...$sha" --jq .status)
             case "$status" in identical|behind) ;; *) echo "::error::$sha is not on main"; exit 1 ;; esac
-            ok=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow pr.yml --commit "$sha" --event push --status success --json databaseId --jq length)
-            if [ "$ok" -lt 1 ]; then echo "::error::No successful CI run for $sha"; exit 1; fi
+            ok=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --event push --commit "$sha"               --json conclusion --jq '[.[] | select(.conclusion == "success")] | length')
+            if [ "$ok" -lt 1 ]; then echo "::error::The CI workflow has no successful run on main for $sha."; exit 1; fi
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "Deploying $sha" >> "$GITHUB_STEP_SUMMARY"
-
-  infra-sandbox:
-    needs: gate
-    uses: ./.github/workflows/infra.yml
-    permissions:
-      id-token: write
-      contents: read
-    with:
-      environment: sandbox
-      action: apply
-      ref: ${{ needs.gate.outputs.sha }}
+          # Whether this is the current tip of main; `terraform` only runs then (see there).
+          tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)
+          if [ "$sha" = "$tip" ]; then echo "is_tip=true" >> "$GITHUB_OUTPUT"; else echo "is_tip=false" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.sha.outputs.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      # Deploys only when something that goes into the image, the assets or the sandbox infrastructure changed, so a push to
+      # main that changes only docs or tests does not roll every environment. A manual run always deploys. The diff is against
+      # the first parent (the whole PR for a merge commit); if it cannot be computed, the run deploys to be safe.
+      - id: changes
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          set -euo pipefail
+          deploy=true
+          if [ "$EVENT" = workflow_run ] && changed=$(git diff --name-only "${SHA}^" "$SHA" 2>/dev/null); then
+            deployable='^(api/|frontend/|infra/|Directory\.Build\.props$|Directory\.Packages\.props$|global\.json$|BccCode\.Template\.slnx$|\.config/dotnet-tools\.json$|\.github/workflows/deploy\.yml$|\.github/actions/)'
+            notdeployed='^api/tests/|^api/AppHost/|\.test\.ts$'
+            # No grep -q in this pipe: it exits on the first match, the first grep then dies of SIGPIPE on a large diff, and
+            # pipefail turns that into "nothing to deploy".
+            if [ -z "$(grep -E "$deployable" <<<"$changed" | grep -vE "$notdeployed" || true)" ]; then
+              deploy=false
+              echo "Nothing deployable changed in $SHA; skipping the deploy." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+          if [ "$deploy" = true ]; then echo "Deploying $SHA" >> "$GITHUB_STEP_SUMMARY"; fi
 
   build:
-    needs: [gate, infra-sandbox]
+    needs: gate
+    if: needs.gate.outputs.deploy == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    # The image is built once and pushed to the sandbox registry; prod receives the same digest.
-    environment: sandbox
-    permissions:
-      id-token: write
-      contents: read
-    env:
-      SHA: ${{ needs.gate.outputs.sha }}
-      REGISTRY_HOST: ${{ vars.GCP_REGION }}-docker.pkg.dev
-      REPOSITORY_PATH: ${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPOSITORY }}
-    outputs:
-      image: ${{ steps.push.outputs.image }}
-      digest: ${{ steps.push.outputs.digest }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -102,179 +115,419 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           frontend: 'true'
-      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+      - run: pnpm --dir frontend build
+      # The API serves index.html and the other root files from the image (Static mode). The hashed files in assets/ are
+      # also in the image, and the bucket serves them to browsers (infra/bucket_assets.tf). No cloud credentials in this
+      # job: it builds the code of the commit and only publishes artifacts.
+      - name: Bake the frontend into the image
+        run: mkdir -p api/BccCode.Template.Api/wwwroot && cp -r frontend/dist/. api/BccCode.Template.Api/wwwroot/
+      # Production runs the pre-generated Wolverine code (ADR 0012).
+      - name: Pre-generate Wolverine code
+        run: dotnet run --project api/BccCode.Template.Api -c Release -- jasper codegen write
+      - name: Publish the container image
+        run: >
+          dotnet publish api/BccCode.Template.Api -c Release /t:PublishContainer
+          -p:ContainerImageTags='"${{ needs.gate.outputs.sha }}"'
+          -p:ContainerArchiveOutputPath=${{ runner.temp }}/api.tar
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
-          project_id: ${{ vars.GCP_PROJECT_ID }}
-      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
-      # One frontend build for every environment: runtime settings come from the API, not from the bundle (standard 06 rule 3).
-      - run: pnpm --dir frontend run build
-      # index.html is served by the API (with the CSP nonce); only the hashed bundles go to the bucket (standard 26 rule 2).
-      # The API reads it from /app/wwwroot in the image (Frontend__StaticPath in infra/cloudrun_api.tf).
-      - name: Bake index.html into the image
-        run: mkdir -p "$API_PROJECT/wwwroot" && cp frontend/dist/index.html "$API_PROJECT/wwwroot/index.html"
-      # The image runs Wolverine with pre-generated code: Release builds have no Roslyn to compile handlers at startup, and the
-      # API asserts that the generated types exist. The code is written from a Debug build (which has Roslyn) into
-      # Internal/Generated, which is not committed, and the Release publish below compiles it into the image. The settings
-      # only let the host build; nothing connects to a database (standard 05, rule 5).
-      - name: Pre-generate the Wolverine code
-        env:
-          ASPNETCORE_ENVIRONMENT: Development
-          ConnectionStrings__template: Host=localhost;Database=x
-        run: |
-          dotnet build "$API_PROJECT" --configuration Debug
-          dotnet run --project "$API_PROJECT" --configuration Debug --no-build -- codegen write
-      - id: push
-        name: Publish the container image (chiseled base image is set in the project file)
-        run: |
-          set -euo pipefail
-          # The SDK pushes straight to Artifact Registry, so the digest is the one the registry holds.
-          export SDK_CONTAINER_REGISTRY_UNAME=oauth2accesstoken
-          export SDK_CONTAINER_REGISTRY_PWORD="$(gcloud auth print-access-token)"
-          dotnet publish "$API_PROJECT" --configuration Release --runtime linux-x64 --self-contained false \
-            /t:PublishContainer \
-            -p:ContainerRegistry="$REGISTRY_HOST" \
-            -p:ContainerRepository="$REPOSITORY_PATH/$IMAGE_NAME" \
-            -p:ContainerImageTags="\"$SHA\""
-          image="$REGISTRY_HOST/$REPOSITORY_PATH/$IMAGE_NAME"
-          digest=$(gcloud artifacts docker images describe "$image:$SHA" --format='value(image_summary.digest)')
-          echo "image=$image" >> "$GITHUB_OUTPUT"
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          echo "Image $image@$digest" >> "$GITHUB_STEP_SUMMARY"
+          name: image
+          path: ${{ runner.temp }}/api.tar
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: assets
           path: frontend/dist/assets
           if-no-files-found: error
+          retention-days: 7
+      # Standard 17.11. Named by commit SHA, which is also the image tag; deploy-sandbox prints the image digest next to it.
+      # The prod job attaches them to the GitHub release (standard 06.13).
+      - name: Generate the SBOMs
+        run: bash .github/scripts/sbom.sh "${{ runner.temp }}/sbom" "${{ needs.gate.outputs.sha }}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom-${{ needs.gate.outputs.sha }}
+          path: ${{ runner.temp }}/sbom
+          if-no-files-found: error
+          retention-days: 90
+
+  # Applies infra/ for the environment before the rollout, in this workflow, so the two cannot race (standard 06.10).
+  # It needs nothing from the build and runs next to it. The called workflow checks out the commit the run started on
+  # (the tip of main for workflow_run), which can be newer than the commit being deployed. So it only runs when the
+  # deployed commit is the tip of main (`is_tip`): an older-commit deploy, such as a re-deploy of a known-good commit,
+  # keeps the current infrastructure instead of applying infra/ from a commit that is not the one being deployed (standard 06.2).
+  terraform:
+    needs: gate
+    if: needs.gate.outputs.is_tip == 'true' && needs.gate.outputs.deploy == 'true'
+    concurrency:
+      group: deploy-sandbox
+      cancel-in-progress: false
+    # @main, not a SHA (exception in standards 03.5 and 17.7): the platform's GCP workload identity trusts the job_workflow_ref
+    # of bcc-platform-deploy at refs/heads/main, so a commit pin is refused (403 getOpenIdToken). Same as other BCC repos.
+    uses: bcc-code/bcc-platform-deploy/.github/workflows/terraform.yml@main
+    permissions:
+      id-token: write # requesting the JWT
+      contents: read # actions/checkout in the called workflow
+    with:
+      component-name: main
+      environment: sandbox
+      path: ./infra
+      action: apply
+      # The BCC monitoring collector (ADR 0026), the same as in infra.yml: Terraform requires both. alert_emails
+      # (infra/monitoring.tf) is a JSON list from the repository variable ALERT_EMAILS_SANDBOX; unset passes nothing.
+      terraform-vars: |-
+        otel_exporter_otlp_endpoint=${{ vars.OTEL_EXPORTER_OTLP_ENDPOINT_DEV }}
+        ${{ vars.ALERT_EMAILS_SANDBOX && format('alert_emails={0}', vars.ALERT_EMAILS_SANDBOX) || '' }}
+    secrets:
+      # By static name, not a computed one (zizmor: overprovisioned-secrets).
+      terraform-vars: |-
+        otel_exporter_otlp_auth_key=${{ secrets.OTEL_EXPORTER_OTLP_AUTH_KEY_DEV }}
 
   deploy-sandbox:
-    needs: [gate, build]
+    needs: [gate, build, terraform]
+    # Terraform is skipped for a commit that is not the tip of main; a failed or cancelled Terraform run still stops the deploy.
+    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.terraform.result == 'success' || needs.terraform.result == 'skipped') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     environment: sandbox
-    # Serialised and never cancelled: a cancelled migration can leave the schema half applied (standard 05 rule 10).
     concurrency:
-      group: env-sandbox
+      group: deploy-sandbox
       cancel-in-progress: false
     permissions:
-      id-token: write
       contents: read
+      id-token: write # Workload Identity Federation
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+      image: ${{ steps.push.outputs.image }}
     env:
-      ENV: sandbox
+      SHA: ${{ needs.gate.outputs.sha }}
       REGION: ${{ vars.GCP_REGION }}
       PROJECT: ${{ vars.GCP_PROJECT_ID }}
-      IMAGE: ${{ needs.build.outputs.image }}@${{ needs.build.outputs.digest }}
-      BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
+      SERVICE: bcc-template-api-sandbox
+      REPOSITORY: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/ar-bcc-template-sandbox
+      # The gateway URL (https://<app>.sandbox.bcc.no). Required: ingress is the internal load balancer from the start, so
+      # the run.app URL answers 404 to the runner and the smoke test fails when this is empty.
+      APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+      # Keep equal to Oidc__Authority in infra/cloudrun_api.tf (oidc_by_environment). The smoke test expects the login
+      # redirect to point there.
+      OIDC_AUTHORITY: https://login.sandbox.bcc.no
     steps:
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ vars.GCP_WIDPP_ID_DEV }}
+          service_account: sa-gha-cicd@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
           project_id: ${{ vars.GCP_PROJECT_ID }}
       - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
+          name: image
+          path: image
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
           name: assets
           path: assets
-      - name: Upload hashed assets without deleting old ones, so a rollback keeps working
-        run: gcloud storage cp --recursive --no-clobber --cache-control="public, max-age=31536000, immutable" assets "gs://$PROJECT-assets/"
-      # --wait fails this job when the migration fails, so no revision rolls out against a missing schema.
-      # Flags after --container apply to that container, so job and service flags such as --region come first.
-      - name: Migrate the database
+
+      - name: Push the image
+        id: push
         run: |
-          gcloud run jobs update "template-migrate-$ENV" --region "$REGION" --container app --image "$IMAGE"
-          gcloud run jobs execute "template-migrate-$ENV" --region "$REGION" --wait
-      - name: Roll out the API
-        run: gcloud run services update "template-api-$ENV" --region "$REGION" --container app --image "$IMAGE"
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+          docker load -i image/api.tar
+          docker tag "bcc-template-api:$SHA" "$REPOSITORY/api:$SHA"
+          docker push "$REPOSITORY/api:$SHA"
+          # The registry digest from the push itself. `gcloud artifacts docker images describe` also reads Container
+          # Analysis occurrences when that API is on, which the CI account may not.
+          digest=$(docker inspect --format='{{range .RepoDigests}}{{println .}}{{end}}' "$REPOSITORY/api:$SHA" \
+            | grep "^$REPOSITORY/api@" | cut -d@ -f2)
+          test -n "$digest"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "image=$REPOSITORY/api@$digest" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Image $SHA"
+            echo "Digest: $digest"
+            echo "SBOM artifact: sbom-$SHA (CycloneDX, .NET and frontend)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Adds objects and never deletes, so the previous release's bundles stay for a Cloud Run rollback (standards 04.12,
+      # 26.11). Before the rollout, so the new index.html never references a missing bundle (06.7).
+      - name: Upload hashed assets
+        run: >
+          gcloud storage rsync --recursive
+          --cache-control="public, max-age=31536000, immutable"
+          assets "gs://$PROJECT-assets/assets"
+
+      # The schema is applied before the rollout and never at application startup (standards 06.6, 12.6), so a revision
+      # never starts against a missing schema. It runs the image that is about to be rolled out, as sa-gha-cicd through
+      # the Cloud SQL Auth Proxy (IAM database authentication; the auth step above provides the credentials). After
+      # db-apply, ownership of the objects moves to the database owner role, so the runtime account, which is in the
+      # same group, can use them. After the asset upload and right before the rollout, which keeps the gap between a
+      # schema change and the code that needs it short; the schema must still be compatible with the previous revision,
+      # since a failed rollout leaves that revision serving. Any failing command fails the job.
+      - name: Apply the database schema
+        env:
+          IMAGE: ${{ steps.push.outputs.image }}
+          DB_NAME: ${{ fromJSON(vars.PROPS).shared_db.db_name }}
+          DB_CONNECTION_NAME: ${{ fromJSON(vars.PROPS).shared_db.connection_name }}
+          # The owner role of the database has the database's name, created by the landing zone.
+          DB_OWNER_ROLE: ${{ fromJSON(vars.PROPS).shared_db.db_name }}
+          # Official release binary, pinned by version and sha256 (standard 17). The hash is the one Google lists in the
+          # release notes of v2.26.2 (github.com/GoogleCloudPlatform/cloud-sql-proxy), and matches the downloaded file.
+          # Keep the version equal to the sidecar in infra/cloudrun_api.tf.
+          PROXY_VERSION: v2.26.2
+          PROXY_SHA256: 787d23b4b396186f307b6b274c94099d25b15a81b7e60c91ceed18c07558e9d7
+        run: |
+          set -euo pipefail
+          db_user="sa-gha-cicd@$PROJECT.iam"
+          curl -sSfLo cloud-sql-proxy "https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/$PROXY_VERSION/cloud-sql-proxy.linux.amd64"
+          echo "$PROXY_SHA256  cloud-sql-proxy" | sha256sum --check --strict
+          chmod +x cloud-sql-proxy
+          ./cloud-sql-proxy --auto-iam-authn --address 127.0.0.1 --port 5432 "$DB_CONNECTION_NAME" &
+          proxy_pid=$!
+          trap 'kill "$proxy_pid" 2>/dev/null || true' EXIT
+          ready=false
+          for _ in $(seq 1 30); do
+            if nc -z 127.0.0.1 5432; then ready=true; break; fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            echo "::error::The Cloud SQL Auth Proxy did not start listening on 5432."; exit 1
+          fi
+          jasper() {
+            docker run --rm --network host \
+              -e Gcp__ProjectId="$PROJECT" \
+              -e ConnectionStrings__template="Host=127.0.0.1;Port=5432;Database=$DB_NAME;Username=$db_user" \
+              "$IMAGE" jasper "$@"
+          }
+          jasper db-apply
+          psql -w -v ON_ERROR_STOP=1 -c "REASSIGN OWNED BY CURRENT_USER TO \"$DB_OWNER_ROLE\"" \
+            "host=127.0.0.1 port=5432 dbname=$DB_NAME user=$db_user"
+          # AutoCreate.None validates nothing, so check the target database matches the image's configuration before the
+          # rollout: the EF Core migrations and Wolverine's envelope tables.
+          jasper db-assert
+
+      # By digest, so the revision runs exactly the image that was pushed (standard 06.3). Service flags such as --region
+      # must come before --container. A rollback (docs/runbooks/rollback.md) pins traffic to an old revision, and new
+      # revisions then get 0 %, so traffic is sent back to the latest revision explicitly.
+      - name: Roll out
+        env:
+          IMAGE: ${{ steps.push.outputs.image }}
+        run: |
+          gcloud run services update "$SERVICE" --region "$REGION" --container app --image "$IMAGE"
+          gcloud run services update-traffic "$SERVICE" --region "$REGION" --to-latest
+          revision=$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'value(status.latestReadyRevisionName)')
+          serving=$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'value(status.traffic[0].revisionName)')
+          echo "Latest ready revision: $revision, serving: $serving"
+          if [ "$revision" != "$serving" ]; then
+            echo "::error::Traffic is not on the new revision $revision"
+            exit 1
+          fi
+
+      # Through the gateway: ingress is the internal load balancer, so the run.app URL is not reachable from the runner.
+      # /health has a Postgres check, so the test also covers the sidecar and IAM authentication.
       - name: Smoke test
         run: |
-          for _ in $(seq 1 12); do curl -fsS "$BASE_URL/health" && break || sleep 5; done
-          curl -fsS "$BASE_URL/health"
-          # An unauthenticated browser request for / is sent to the login (standard 06 rule 9). TODO: confirm for this app.
-          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Accept: text/html' "$BASE_URL/")" = 302
+          if [ -z "$APP_BASE_URL" ]; then
+            echo "::error::APP_BASE_URL is empty. Set it to the gateway URL in the sandbox environment (docs/runbooks/first-deploy.md); the run.app URL answers 404 because ingress is the internal load balancer."; exit 1
+          fi
+          url="$APP_BASE_URL"
+          echo "Testing $url"
+          curl_opts=(--silent --show-error --fail --max-time 30 --retry 3 --retry-delay 5 --retry-all-errors)
+          curl "${curl_opts[@]}" "$url/health"
+          echo
+          # Everything but /health and /alive requires a session. Anonymous navigation to the shell is redirected to the
+          # identity provider (curl does not follow redirects), and the redirect carries the security headers.
+          # --fail is left out here because the expected status is not 2xx.
+          status=$(curl --silent --show-error --max-time 30 --retry 3 --retry-delay 5 --retry-all-errors \
+            --output /dev/null --dump-header headers.txt --write-out '%{http_code}' "$url/")
+          test "$status" = 302
+          tr -d '\r' < headers.txt | grep -iE "^location: $OIDC_AUTHORITY/authorize"
+          grep -iE '^strict-transport-security: max-age=31536000' headers.txt
+          grep -iE '^x-content-type-options: nosniff' headers.txt
+          # An API call without a session is 401, never a redirect.
+          status=$(curl --silent --show-error --max-time 30 --retry 3 --retry-delay 5 --retry-all-errors \
+            --output /dev/null --write-out '%{http_code}' "$url/api/me")
+          test "$status" = 401
 
-  sbom:
-    needs: gate
-    uses: ./.github/workflows/sbom.yml
-    permissions:
-      contents: read
-    with:
-      ref: ${{ needs.gate.outputs.sha }}
-
+  # Behind the required reviewers of the `prod` environment, which approve a known artifact: the build of this run, already
+  # rolled out and smoke tested in sandbox. Prod has its own project and registry, so the image is not pulled from sandbox:
+  # the same tarball goes to the prod registry, and the pushed digest must equal the sandbox digest. Prod infrastructure is
+  # applied by hand (infra.yml, environment prod) and must be current before a release that changes infra/ is promoted.
   deploy-prod:
-    needs: [gate, build, deploy-sandbox, sbom]
+    needs: [gate, build, deploy-sandbox]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    # Required reviewers on this environment approve a known artifact: the digest that ran in sandbox.
+    timeout-minutes: 20
     environment: prod
+    # The group infra.yml uses for prod, so a prod Terraform run and this job never overlap.
     concurrency:
-      group: env-prod
+      group: deploy-prod
       cancel-in-progress: false
     permissions:
-      id-token: write
-      contents: write # git tag and GitHub release
+      contents: write # the release and its tag
+      id-token: write # Workload Identity Federation
     env:
-      ENV: prod
+      SHA: ${{ needs.gate.outputs.sha }}
+      SANDBOX_DIGEST: ${{ needs.deploy-sandbox.outputs.digest }}
       REGION: ${{ vars.GCP_REGION }}
       PROJECT: ${{ vars.GCP_PROJECT_ID }}
-      SHA: ${{ needs.gate.outputs.sha }}
-      SOURCE_IMAGE: ${{ needs.build.outputs.image }}
-      DIGEST: ${{ needs.build.outputs.digest }}
-      PROD_IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.GCP_ARTIFACT_REPOSITORY }}/template-api
-      BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
+      SERVICE: bcc-template-api-prod
+      REPOSITORY: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/ar-bcc-template-prod
+      # The gateway URL of prod. Required: ingress is internal, so the run.app URL is not reachable from the runner. Set it
+      # in the prod environment before the first prod deploy.
+      APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+      # Keep equal to Oidc__Authority in infra/cloudrun_api.tf (oidc_by_environment).
+      OIDC_AUTHORITY: https://login.bcc.no
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.gate.outputs.sha }}
-          fetch-depth: 0
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
-          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ vars.GCP_WIDPP_ID_PROD }}
+          service_account: sa-gha-cicd@${{ vars.GCP_PROJECT_ID }}.iam.gserviceaccount.com
           project_id: ${{ vars.GCP_PROJECT_ID }}
       - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: image
+          path: image
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: assets
           path: assets
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: sbom
+          name: sbom-${{ needs.gate.outputs.sha }}
           path: sbom
-      # A registry-to-registry copy keeps the manifest, so the digest is the same. The prod deploy account can read the
-      # sandbox repository through image_reader_members (infra/README.md). Both registries are on the same host.
-      - name: Copy the image digest from sandbox
+
+      # The same tarball and the same docker load and push as in sandbox, so the registry computes the same manifest. A
+      # different digest means prod would run something sandbox never ran, so the job stops before anything changes.
+      - name: Push the image
+        id: push
         run: |
           set -euo pipefail
           gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
-          docker buildx imagetools create --tag "$PROD_IMAGE:$SHA" "$SOURCE_IMAGE@$DIGEST"
-          copied=$(gcloud artifacts docker images describe "$PROD_IMAGE:$SHA" --format='value(image_summary.digest)')
-          if [ "$copied" != "$DIGEST" ]; then echo "::error::Digest changed during the copy ($DIGEST -> $copied)"; exit 1; fi
-          echo "Promoting $PROD_IMAGE@$DIGEST" >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload hashed assets without deleting old ones, so a rollback keeps working
-        run: gcloud storage cp --recursive --no-clobber --cache-control="public, max-age=31536000, immutable" assets "gs://$PROJECT-assets/"
-      - name: Migrate the database
+          docker load -i image/api.tar
+          docker tag "bcc-template-api:$SHA" "$REPOSITORY/api:$SHA"
+          docker push "$REPOSITORY/api:$SHA"
+          digest=$(docker inspect --format='{{range .RepoDigests}}{{println .}}{{end}}' "$REPOSITORY/api:$SHA"             | grep "^$REPOSITORY/api@" | cut -d@ -f2)
+          test -n "$digest"
+          if [ "$digest" != "$SANDBOX_DIGEST" ]; then
+            echo "::error::The prod digest $digest differs from the sandbox digest $SANDBOX_DIGEST. Nothing was rolled out."; exit 1
+          fi
+          echo "image=$REPOSITORY/api@$digest" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Prod image $SHA"
+            echo "Digest: $digest (the sandbox digest)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Adds objects and never deletes, so the previous release's bundles stay for a Cloud Run rollback (standards 04.12,
+      # 26.11). Before the rollout, so the new index.html never references a missing bundle (06.7).
+      - name: Upload hashed assets
+        run: >
+          gcloud storage rsync --recursive
+          --cache-control="public, max-age=31536000, immutable"
+          assets "gs://$PROJECT-assets/assets"
+
+      # The schema is applied before the rollout and never at application startup (standards 06.6, 12.6), so a revision
+      # never starts against a missing schema. It runs the image that is about to be rolled out, as sa-gha-cicd through
+      # the Cloud SQL Auth Proxy (IAM database authentication; the auth step above provides the credentials). After
+      # db-apply, ownership of the objects moves to the database owner role, so the runtime account, which is in the
+      # same group, can use them. After the asset upload and right before the rollout, which keeps the gap between a
+      # schema change and the code that needs it short; the schema must still be compatible with the previous revision,
+      # since a failed rollout leaves that revision serving. Any failing command fails the job.
+      - name: Apply the database schema
+        env:
+          IMAGE: ${{ steps.push.outputs.image }}
+          DB_NAME: ${{ fromJSON(vars.PROPS).shared_db.db_name }}
+          DB_CONNECTION_NAME: ${{ fromJSON(vars.PROPS).shared_db.connection_name }}
+          # The owner role of the database has the database's name, created by the landing zone.
+          DB_OWNER_ROLE: ${{ fromJSON(vars.PROPS).shared_db.db_name }}
+          # Official release binary, pinned by version and sha256 (standard 17). The hash is the one Google lists in the
+          # release notes of v2.26.2 (github.com/GoogleCloudPlatform/cloud-sql-proxy), and matches the downloaded file.
+          # Keep the version equal to the sidecar in infra/cloudrun_api.tf.
+          PROXY_VERSION: v2.26.2
+          PROXY_SHA256: 787d23b4b396186f307b6b274c94099d25b15a81b7e60c91ceed18c07558e9d7
         run: |
-          gcloud run jobs update "template-migrate-$ENV" --region "$REGION" --container app --image "$PROD_IMAGE@$DIGEST"
-          gcloud run jobs execute "template-migrate-$ENV" --region "$REGION" --wait
-      - name: Roll out the API
-        run: gcloud run services update "template-api-$ENV" --region "$REGION" --container app --image "$PROD_IMAGE@$DIGEST"
+          set -euo pipefail
+          db_user="sa-gha-cicd@$PROJECT.iam"
+          curl -sSfLo cloud-sql-proxy "https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/$PROXY_VERSION/cloud-sql-proxy.linux.amd64"
+          echo "$PROXY_SHA256  cloud-sql-proxy" | sha256sum --check --strict
+          chmod +x cloud-sql-proxy
+          ./cloud-sql-proxy --auto-iam-authn --address 127.0.0.1 --port 5432 "$DB_CONNECTION_NAME" &
+          proxy_pid=$!
+          trap 'kill "$proxy_pid" 2>/dev/null || true' EXIT
+          ready=false
+          for _ in $(seq 1 30); do
+            if nc -z 127.0.0.1 5432; then ready=true; break; fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            echo "::error::The Cloud SQL Auth Proxy did not start listening on 5432."; exit 1
+          fi
+          jasper() {
+            docker run --rm --network host \
+              -e Gcp__ProjectId="$PROJECT" \
+              -e ConnectionStrings__template="Host=127.0.0.1;Port=5432;Database=$DB_NAME;Username=$db_user" \
+              "$IMAGE" jasper "$@"
+          }
+          jasper db-apply
+          psql -w -v ON_ERROR_STOP=1 -c "REASSIGN OWNED BY CURRENT_USER TO \"$DB_OWNER_ROLE\"" \
+            "host=127.0.0.1 port=5432 dbname=$DB_NAME user=$db_user"
+          # AutoCreate.None validates nothing, so check the target database matches the image's configuration before the
+          # rollout: the EF Core migrations and Wolverine's envelope tables.
+          jasper db-assert
+
+      # By digest, so the revision runs exactly the image that was pushed (standard 06.3). Service flags such as --region
+      # must come before --container. A rollback (docs/runbooks/rollback.md) pins traffic to an old revision, and new
+      # revisions then get 0 %, so traffic is sent back to the latest revision explicitly.
+      - name: Roll out
+        env:
+          IMAGE: ${{ steps.push.outputs.image }}
+        run: |
+          gcloud run services update "$SERVICE" --region "$REGION" --container app --image "$IMAGE"
+          gcloud run services update-traffic "$SERVICE" --region "$REGION" --to-latest
+          revision=$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'value(status.latestReadyRevisionName)')
+          serving=$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'value(status.traffic[0].revisionName)')
+          echo "Latest ready revision: $revision, serving: $serving"
+          if [ "$revision" != "$serving" ]; then
+            echo "::error::Traffic is not on the new revision $revision"
+            exit 1
+          fi
+
+      # Through the gateway: prod ingress is internal. /health has a Postgres check, so the test also covers the sidecar
+      # and IAM authentication.
       - name: Smoke test
         run: |
-          for _ in $(seq 1 12); do curl -fsS "$BASE_URL/health" && break || sleep 5; done
-          curl -fsS "$BASE_URL/health"
-          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Accept: text/html' "$BASE_URL/")" = 302
-      # Answers "what is in prod" without reading logs (standard 06 rule 13).
+          if [ -z "$APP_BASE_URL" ]; then
+            echo "::error::APP_BASE_URL is empty. Set it to the gateway URL in the prod environment (docs/runbooks/first-deploy.md); the run.app URL answers 404 because ingress is the internal load balancer."; exit 1
+          fi
+          url="$APP_BASE_URL"
+          echo "Testing $url"
+          curl_opts=(--silent --show-error --fail --max-time 30 --retry 3 --retry-delay 5 --retry-all-errors)
+          curl "${curl_opts[@]}" "$url/health"
+          echo
+          # Everything but /health and /alive requires a session. Anonymous navigation to the shell is redirected to the
+          # identity provider (curl does not follow redirects), and the redirect carries the security headers.
+          # --fail is left out here because the expected status is not 2xx.
+          status=$(curl --silent --show-error --max-time 30 --retry 3 --retry-delay 5 --retry-all-errors \
+            --output /dev/null --dump-header headers.txt --write-out '%{http_code}' "$url/")
+          test "$status" = 302
+          tr -d '\r' < headers.txt | grep -iE "^location: $OIDC_AUTHORITY/authorize"
+          grep -iE '^strict-transport-security: max-age=31536000' headers.txt
+          grep -iE '^x-content-type-options: nosniff' headers.txt
+          # An API call without a session is 401, never a redirect.
+          status=$(curl --silent --show-error --max-time 30 --retry 3 --retry-delay 5 --retry-all-errors \
+            --output /dev/null --write-out '%{http_code}' "$url/api/me")
+          test "$status" = 401
+
+      # Answers "what is in prod" without reading logs (standard 06.13): a tag per production deploy, with the SBOMs.
       - name: Tag and release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           day=$(date -u +%Y-%m-%d)
-          n=$(( $(git ls-remote --tags origin "refs/tags/prod-$day.*" | wc -l) + 1 ))
+          n=$(( $(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/prod-$day." --jq length) + 1 ))
           tag="prod-$day.$n"
-          gh release create "$tag" --target "$SHA" --title "$tag" --generate-notes \
-            --notes-start-tag "$(git tag --list 'prod-*' --sort=-creatordate | head -n1)" sbom/* 2>/dev/null \
-            || gh release create "$tag" --target "$SHA" --title "$tag" --generate-notes sbom/*
-          echo "Released $tag (image digest $DIGEST)" >> "$GITHUB_STEP_SUMMARY"
+          previous=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,createdAt             --jq '[.[] | select(.tagName | startswith("prod-"))] | sort_by(.createdAt) | last | .tagName // empty')
+          args=(--repo "$GITHUB_REPOSITORY" --target "$SHA" --title "$tag" --generate-notes)
+          if [ -n "$previous" ]; then args+=(--notes-start-tag "$previous"); fi
+          gh release create "$tag" "${args[@]}" sbom/*
+          echo "Released $tag (image digest $SANDBOX_DIGEST)" >> "$GITHUB_STEP_SUMMARY"

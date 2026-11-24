@@ -6,7 +6,7 @@ const { t } = useI18n()
 
 <template>
   <section class="flex flex-col gap-4" data-testid="no-access">
-    <h1 class="m-0 text-2xl font-semibold">{{ t('noAccess.title') }}</h1>
+    <h1 class="m-0 heading-xl">{{ t('noAccess.title') }}</h1>
     <p class="m-0">{{ t('noAccess.text') }}</p>
     <p class="m-0">
       <RouterLink to="/notes">{{ t('noAccess.home') }}</RouterLink>

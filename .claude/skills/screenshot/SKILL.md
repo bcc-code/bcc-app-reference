@@ -30,9 +30,10 @@ playwright-cli -s=user open --browser=chrome "$APP"
 playwright-cli -s=user run-code --filename="$SCRATCH/login-user.run.js"
 ```
 
-`__PERSON__` is `user` (plain member), `user2` (a second member, for ownership checks) or `admin`
-(has the admin role). Use one playwright-cli session per persona (`-s=user`, `-s=admin`), so they stay
-logged in side by side. The personas come from the OIDC mock (`api/OidcMock/`); keep the table in
+`__PERSON__` is `user` (plain member), `user2` (a second member, for ownership checks) or `admin` (has the admin role and
+signs in with a second factor). `admin-no-mfa` has the role without a second factor and ends on the second-factor page, so it is
+not offered for captures. Use one playwright-cli session per persona (`-s=user`, `-s=admin`), so they stay logged in side by
+side. The personas come from the OIDC mock (`api/OidcMock/Personas.cs`); keep the table in
 `login.js` in step with it.
 
 Run `open` from the repository root, so playwright-cli picks up `.playwright/cli.config.json`, which
@@ -71,7 +72,7 @@ folder is right.
 
 ## Documentation images
 
-Images for `docs/user-manual/` are taken with the same scripts or a dedicated set, with these
+Images for `docs/manual/` are taken with the same scripts or a dedicated set, with these
 differences (standard 20, rules 8 to 11):
 
 - Name them `<view>/<scenario>.<viewport>.<lang>.png` and store them with Git LFS.

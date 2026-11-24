@@ -1,43 +1,39 @@
-# Connects the API and the assets bucket to the BCC platform gateway. The route itself (host name, which paths go to the
-# bucket) is registered in the gateway repository as routes/<app>.yaml, with this shape (standard 26):
+# Backends for the BCC platform gateway. The route itself is in bcc-platform-gateway, routes/<app>.yaml
+# (the hostname is in the route file): default backend `api`, /assets and /assets/* to `assets` (standard 26.2).
 #
-#   backends:
-#     api:    { type: cloud_run }       # bs-<app>-api-<env>
-#     assets: { type: backend_bucket }  # bb-<app>-assets-<env>
-#   hosts:
-#     - name: web
-#       default_backend: api            # the API serves index.html
-#       routes:
-#         - paths: ["/assets", "/assets/*"]
-#           backend: assets
+# Name contract: the gateway finds these by constructed name, so app and component must match the route file.
+#   app "<app>" + component "api"    -> backendServices/bs-<app>-api-<env>
+#   app "<app>" + component "assets" -> backendBuckets/bb-<app>-assets-<env>
+# A mismatch is not caught until the gateway plan.
 #
-# Apply order: apply this file first, then merge the route; remove the route before destroying or renaming a backend.
+# Order: apply this first, then merge the route PR. Remove the route before renaming or destroying a backend (26.5).
 #
-# The modules are pinned to a commit of bcc-code/bcc-platform-gateway-tf-modules. The repository has no release tags yet
-# (checked 2026-10-19); switch to a tag when the platform team publishes one. Dependabot's terraform ecosystem does not
-# follow SHA refs, so update the pin by hand.
+# Both modules are pinned to the commit of 2026-09-08 ("enable CDN by default"); the repository has no tags
+# (standards 03.5, 26.6).
 module "gateway_backend_api" {
   source = "git::https://github.com/bcc-code/bcc-platform-gateway-tf-modules//gateway-backend?ref=69e6a4923b19858b9061e3679172d4b598764536"
 
-  app         = var.gateway_app
+  app         = local.app
   component   = "api"
   environment = local.env
 
   cloud_run_service = google_cloud_run_v2_service.api.name
-  region            = google_cloud_run_v2_service.api.location # must be the service's own region (standard 26 rule 3)
+  # A NEG in another region than the service resolves to nothing at request time (standard 26.3).
+  region = google_cloud_run_v2_service.api.location
+  # This instance keeps the default grant_gateway_access = true, the project-scoped gateway grant. The bucket
+  # instance below must not hold it too (standard 26.4).
 }
 
 module "gateway_backend_assets" {
   source = "git::https://github.com/bcc-code/bcc-platform-gateway-tf-modules//gateway-backend-bucket?ref=69e6a4923b19858b9061e3679172d4b598764536"
 
-  app         = var.gateway_app
+  app         = local.app
   component   = "assets"
   environment = local.env
 
   bucket = google_storage_bucket.assets.name
-  # Only one module instance per project may hold the project-scoped gateway grant (standard 26 rule 4): the API one.
+  # Lets the load balancer's service agent read the private bucket (standard 26.10). It can fail on the first apply,
+  # because the agent is created with the project's first backend bucket; apply again.
+  grant_object_access  = true
   grant_gateway_access = false
-  # Lets the load balancer's service agent read the private bucket. Can fail on the first apply, because the agent is
-  # created with the project's first backend bucket; apply again.
-  grant_object_access = true
 }

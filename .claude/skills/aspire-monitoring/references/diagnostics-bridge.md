@@ -7,7 +7,7 @@
 ```
 Is the request about AppHost code or deployment definition?
 │
-├── YES → Route to aspire-deployment skill (see aspire/references/csharp-apphosts.md for code edits)
+├── YES → Route to aspire-deployment skill (and aspireify for code edits)
 │
 └── NO → Is the app running locally (via aspire start)?
     │
@@ -137,7 +137,7 @@ are written to this child's console log stream.
 | Start browser diagnostics | `aspire resource <frontend>-browser-logs open-tracked-browser` |
 | Inspect browser console output | `aspire logs <frontend>-browser-logs` |
 | Check whether a frontend has it enabled | Look for `.WithBrowserLogs()` in the AppHost |
-| Add `WithBrowserLogs()` to a resource | → `aspire/references/csharp-apphosts.md` (AppHost authoring) |
+| Add `WithBrowserLogs()` to a resource | → **`aspireify` skill** (AppHost authoring) |
 
 `<frontend>-browser-logs` is not hidden by default. Start with normal `aspire describe`
 output; `aspire ps` is AppHost-level in 13.5. Retry with

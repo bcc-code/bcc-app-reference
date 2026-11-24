@@ -1,9 +1,10 @@
 name: Supply-chain security
 
-# BCC's reusable scan (standard 17 rule 12), on changes to workflows, manifests, lock files and Dockerfiles.
+# BCC's reusable policy check for workflows, npm manifests and lockfiles (standard 17.12). A required status check would
+# stay pending on PRs this path filter skips, so do not make this workflow a required check.
+# No branch filter on pull_request: a stacked PR targets another branch.
 on:
   pull_request:
-    branches: [main]
     paths: &supply-chain-paths
       - ".github/workflows/**"
       - "**/action.yml"

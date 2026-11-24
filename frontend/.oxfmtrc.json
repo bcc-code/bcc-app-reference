@@ -3,15 +3,7 @@
   "printWidth": 130,
   "singleQuote": true,
   "semi": false,
-  "ignorePatterns": [
-    "**/bin/**",
-    "**/obj/**",
-    "**/node_modules/**",
-    "dist",
-    "playwright-report",
-    "test-results",
-    "pnpm-lock.yaml"
-  ],
+  "ignorePatterns": ["**/bin/**", "**/obj/**", "**/node_modules/**", "dist", "pnpm-lock.yaml"],
   "vueIndentScriptAndStyle": false,
   "endOfLine": "lf"
 }

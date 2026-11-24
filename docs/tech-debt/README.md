@@ -1,6 +1,6 @@
 # Tech debt and out-of-scope follow-ups
 
-One file per known issue. There are none yet. When an issue is resolved, delete its file in the same commit as the fix. Git
+One file per known issue. When an issue is resolved, delete its file in the same commit as the fix. Git
 history keeps the record: `git log --diff-filter=D -- docs/tech-debt/` lists what was closed.
 
 There is deliberately **no index file**. A committed list of every issue is the one file every branch would append to, so it
@@ -33,7 +33,7 @@ decision-by: "..."        # only when status is needs-decision and someone speci
 effort: S                 # XS < 1 h | S half a day | M a day or two | L multi-day or needs design
 priority: P2              # P0 blocks a release or deploy | P1 wrong behaviour a user will hit | P2 real defect, not urgent | P3 hygiene
 scope: general            # where the fix lands: api | frontend | infra | docs | general (add values as the project needs them)
-area: correctness         # topic: correctness, permissions, performance, testing, privacy, deployment (add if none fits)
+area: correctness         # topic: correctness, permissions, performance, testing, privacy, deployment, hygiene, documentation, api (add if none fits)
 ---
 ```
 

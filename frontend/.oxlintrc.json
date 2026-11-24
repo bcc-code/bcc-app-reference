@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": ["dist", "src/client/**", "playwright-report", "test-results"],
+  "ignorePatterns": ["dist", "src/client/**"],
   "plugins": ["eslint", "typescript", "unicorn", "oxc", "vue", "vitest"],
   "env": {
     "browser": true
@@ -52,7 +52,7 @@
       }
     },
     {
-      "files": ["src/**/*.test.ts", "e2e/**/*.ts"],
+      "files": ["src/**/*.test.ts"],
       "rules": {
         "vitest-js/consistent-test-it": ["error", { "fn": "it" }],
         "vitest-js/require-top-level-describe": "error",

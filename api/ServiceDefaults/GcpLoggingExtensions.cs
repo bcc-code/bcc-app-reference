@@ -33,10 +33,15 @@ public static class GcpLoggingExtensions
     /// </summary>
     public const string ProjectIdConfigurationKey = "Gcp:ProjectId";
 
+    public static bool IsCloudRun(IConfiguration configuration)
+    {
+        return !string.IsNullOrWhiteSpace(configuration[CloudRunServiceVariable]);
+    }
+
     public static TBuilder AddGcpStructuredLogging<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
-        if (string.IsNullOrWhiteSpace(builder.Configuration[CloudRunServiceVariable]))
+        if (!IsCloudRun(builder.Configuration))
             return builder;
 
         var projectId = builder.Configuration[ProjectIdConfigurationKey];

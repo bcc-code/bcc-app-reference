@@ -1,6 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <ContainerRepository>bcc-template-oidcmock</ContainerRepository>
+    <!-- ICU and tzdata. .NET 11 images are Ubuntu 26.04 "resolute"; there are no noble images. -->
+    <ContainerFamily>resolute-chiseled-extra</ContainerFamily>
+  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <PackageReference Include="Npgsql" />
     <PackageReference Include="OpenIddict.AspNetCore" />
     <PackageReference Include="OpenIddict.EntityFrameworkCore" />
   </ItemGroup>

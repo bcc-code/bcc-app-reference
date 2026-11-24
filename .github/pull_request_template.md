@@ -1,10 +1,18 @@
-## What and why
+## Summary
 
 <!-- What does this change, and why? Link the issue or ClickUp task. -->
 
-## How it was checked
+## Changes
 
-<!-- Tests added or changed, manual checks, screenshots for UI changes. -->
+<!-- The notable changes, by area. Screenshots for UI changes. -->
+
+## Review notes
+
+<!-- What a reviewer should look at first, decisions that could go the other way, and anything left out on purpose. -->
+
+## Testing
+
+<!-- Tests added or changed, and manual checks. -->
 
 ## Privacy
 
@@ -15,7 +23,7 @@
 - Stored where:
 - Retention and deletion:
 - Who can see it:
-- `docs/privacy/data-inventory.md` updated: yes / no / not needed
+- `docs/data-protection/data-inventory.md` updated: yes / no / not needed
 
 ## Checklist
 

@@ -4,3 +4,35 @@
 /* Unlayered on purpose: wrapping it in a layer fails the build ("@custom-variant cannot be nested"). */
 @import '@bcc-code/component-library-vue/theme.css';
 @import '@bcc-code/component-library-vue/archivo-font.css';
+
+/*
+ * The typography tokens (heading-*, label-*, body-*) end in the bare family "Archivo", so text in them falls back to the
+ * browser's serif until the font has loaded. The tokens' stylesheet defines them on :root, unlayered, from
+ * --font-family-archivo, so the same stack as font-sans goes there, unlayered too and after it.
+ */
+:root {
+  --font-family-archivo: 'Archivo', system-ui, sans-serif;
+}
+
+@layer base {
+  /* A heading takes a heading-* token where it is used; without one it still has the design system's heading weight. */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: var(--font-weight-semibold);
+  }
+
+  /* Links in running text, translated texts included, in the link colour. A link that looks like something else (a menu
+     item, a button) sets its own colour and decoration, which win over the base layer. */
+  a {
+    color: var(--color-link-default);
+    text-decoration: underline;
+  }
+
+  a:hover {
+    color: var(--color-link-pressed);
+  }
+}
