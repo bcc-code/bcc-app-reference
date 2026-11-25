@@ -1,9 +1,14 @@
 version: 2
 
+# Dependabot opens no pull requests: every ecosystem has open-pull-requests-limit: 0, and security updates are
+# switched off in the repository settings. The groups, ignores and cooldowns below still describe how dependencies
+# should move, for whoever (or whatever) updates them by hand.
+
 # Every ecosystem waits 7 days after a release (cooldown), the same quarantine as minimumReleaseAge in
 # frontend/pnpm-workspace.yaml. Without it Dependabot opens npm PRs that pnpm then refuses to install (standard 17.3).
 updates:
   - package-ecosystem: nuget
+    open-pull-requests-limit: 0
     directory: /
     schedule:
       interval: weekly
@@ -12,7 +17,6 @@ updates:
       timezone: Europe/Oslo
     cooldown:
       default-days: 7
-    open-pull-requests-limit: 10
     commit-message:
       prefix: chore
       include: scope
@@ -31,6 +35,7 @@ updates:
         update-types: [minor, patch]
 
   - package-ecosystem: npm
+    open-pull-requests-limit: 0
     directory: /frontend
     schedule:
       interval: weekly
@@ -41,7 +46,6 @@ updates:
     cooldown:
       default-days: 7
       exclude: ['@bcc-code/*']
-    open-pull-requests-limit: 10
     commit-message:
       prefix: chore
       include: scope
@@ -65,6 +69,7 @@ updates:
         update-types: [minor, patch]
 
   - package-ecosystem: github-actions
+    open-pull-requests-limit: 0
     # The composite setup action holds pins too.
     directories: [/, /.github/actions/*]
     schedule:
@@ -84,6 +89,7 @@ updates:
   # The Structurizr images (docs/architecture/Dockerfile). Both stages are one release, so they come in one PR. A new
   # export image fails the `architecture` check until docs/architecture/export.sh is run and the SVGs are committed.
   - package-ecosystem: docker
+    open-pull-requests-limit: 0
     directory: /docs/architecture
     schedule:
       interval: weekly
@@ -103,6 +109,7 @@ updates:
   # gateway modules are git sources pinned by commit SHA (infra/gateway_backend.tf); Dependabot may not move those, so raise
   # the pins by hand through a PR.
   - package-ecosystem: terraform
+    open-pull-requests-limit: 0
     directories:
       - /infra
       - /infra/preview
