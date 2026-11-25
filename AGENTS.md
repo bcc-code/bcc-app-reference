@@ -196,6 +196,10 @@ Actions minutes are billed per job, rounded up to a whole minute, and every job 
 that already runs (with a step-level `if:` on its path filter) rather than as a new job ([ADR 0030](docs/adrs/0030-fewer-ci-jobs-to-cut-billed-minutes.md)).
 There is no NuGet package cache on purpose: the packages are about 2 GB, and a restore from nuget.org takes 12–23 s.
 
+A push to `main` skips the path-filtered jobs when a passed PR run recorded the same tree (artifact `ci-passed-<tree>-<base>`) and
+`<base>` is green on `main`; the run still succeeds, so `deploy.yml` starts as before. It needs a merge commit: a squash or rebase
+merge, or a PR that was behind `main`, runs CI in full again. Keep the `tested` step and the path filter's diff base in step.
+
 ## Deployment
 
 One Cloud Run service (`bcc-template-api-<env>`) in a GCP project from the platform landing zone (`provision-project.yml`), shared Cloud SQL

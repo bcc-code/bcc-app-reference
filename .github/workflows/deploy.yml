@@ -6,7 +6,8 @@ run-name: Deploy - ${{ github.event.workflow_run.display_title || inputs.sha || 
 # environment, the same image goes to prod. See ADR 0014.
 on:
   # Runs when the CI workflow (ci.yml) has finished on main. The gate job only proceeds when it succeeded for a push, so
-  # the exact commit has passed CI (standard 06.2).
+  # the exact commit has passed CI (standard 06.2): in full, or as the tree a pull request run tested (see `changes` in
+  # ci.yml and ADR 0030).
   workflow_run:
     workflows: [CI]
     types: [completed]

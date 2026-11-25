@@ -48,6 +48,6 @@ Most of these ADRs are adapted from the BCC A-team application (bcc-ateam). The 
 | [0026](0026-telemetry-export-through-the-bcc-monitoring-collector.md) | Telemetry export through the BCC monitoring collector, best effort under request-based billing | Proposed |
 | [0027](0027-pr-previews-in-a-preview-project.md) | PR previews run in a preview project, one Postgres schema per PR | Proposed |
 | [0029](0029-timeprovider-as-the-clock.md) | TimeProvider as the clock | Proposed |
-| [0030](0030-fewer-ci-jobs-to-cut-billed-minutes.md) | Fewer CI jobs to cut billed Actions minutes | Proposed |
+| [0030](0030-fewer-ci-jobs-to-cut-billed-minutes.md) | Fewer CI jobs and no second run on main, to cut billed Actions minutes | Proposed |
 
 This list is kept by hand. When you add an ADR, add its row here.

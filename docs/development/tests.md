@@ -78,6 +78,7 @@ The checks are defined in `.github/workflows/ci.yml`; run the same commands befo
 - Terraform `fmt` and `validate` for `infra/`, `infra/preview` and `infra/preview-shared`, and `bash .github/scripts/preview-decide.test.sh`.
 - `sast`: gitleaks and Semgrep; the supply-chain workflow is separate.
 - `integration` and `e2e`: the integration tests and the Playwright tests above, each in a job of its own.
-- `ci`: aggregates all jobs and is the one check to require.
+- `ci`: aggregates all jobs and is the one check to require. On a passed PR run it records the tested tree, so the push to `main`
+  after a merge commit can skip the jobs that already passed ([ADR 0030](../adrs/0030-fewer-ci-jobs-to-cut-billed-minutes.md)).
 
 Never delete, skip or weaken a test to make CI green. Fix the cause, or stop and report.

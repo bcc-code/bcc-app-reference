@@ -4,6 +4,8 @@ name: CI
 # Path filtering happens in the `changes` job (standard 05.1, 05.2).
 on:
   pull_request:
+  # deploy.yml runs after this workflow succeeds for a push to main. A push whose tree a pull request run already tested
+  # skips the path-filtered jobs (see `changes`) and still succeeds.
   push:
     branches: [main]
   workflow_dispatch:
@@ -24,25 +26,81 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read # the `tested` step lists pull request runs and their artifacts
     outputs:
       backend: ${{ steps.filter.outputs.backend }}
       frontend: ${{ steps.filter.outputs.frontend }}
       infra: ${{ steps.filter.outputs.infra }}
       architecture: ${{ steps.filter.outputs.architecture }}
+      # Pull requests only: the tree of the tested merge commit and the commit the filter compared it with. `ci` records
+      # both in an artifact name when the run passes, for the `tested` step of a later push to main.
+      tree: ${{ steps.filter.outputs.tree }}
+      base: ${{ steps.filter.outputs.base }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+      # A push to main whose tree a pull request run already tested needs no second run (ADR 0030). That holds when a
+      # successful run of this workflow for the merged PR head (same repository, not a fork) recorded
+      # `ci-passed-<tree>-<base>` with this commit's tree, and <base> has a successful CI run on main: the jobs the PR run
+      # skipped cover files that are the same in <base> and here, and <base> passed them. Anything else runs in full: a
+      # squash or rebase merge, main moved after the PR run (another tree), a failed or cancelled PR run, a base without a
+      # green run on main (a stacked PR's base, a broken main), or an error here (continue-on-error leaves `run` empty).
+      # deploy.yml is unaffected: this run still succeeds for the push, with the path-filtered jobs skipped.
+      - id: tested
+        if: github.event_name == 'push'
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          read -r _ _ head extra <<< "$(git rev-list --parents -n 1 HEAD)"
+          if [ -z "$head" ] || [ -n "$extra" ]; then
+            echo "$GITHUB_SHA is not a merge of two commits, so CI runs in full."; exit 0
+          fi
+          tree=$(git rev-parse 'HEAD^{tree}')
+          runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?event=pull_request&status=success&head_sha=$head&per_page=100" \
+            --jq '.workflow_runs[] | select(.conclusion == "success" and .head_repository.full_name == env.GITHUB_REPOSITORY) | .id')
+          for run in $runs; do
+            names=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/artifacts?per_page=100" --jq '.artifacts[].name')
+            for name in $names; do
+              case "$name" in
+                "ci-passed-$tree-"*) base=${name#"ci-passed-$tree-"} ;;
+                *) continue ;;
+              esac
+              [[ "$base" =~ ^[0-9a-f]{40}$ ]] || continue
+              green=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --branch main --commit "$base" \
+                --json conclusion,event \
+                --jq '[.[] | select(.conclusion == "success" and (.event == "push" or .event == "workflow_dispatch"))] | length')
+              if [ "$green" -gt 0 ]; then
+                echo "run=$run" >> "$GITHUB_OUTPUT"
+                echo "::notice::Tree $tree passed in pull request run $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run (compared with $base, green on main), so the path-filtered jobs are skipped."
+                exit 0
+              fi
+              echo "Run $run tested tree $tree against $base, which has no successful CI run on main."
+            done
+          done
+          echo "No successful pull request run of $head recorded tree $tree with a green base, so CI runs in full."
       - id: filter
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          TESTED_RUN: ${{ steps.tested.outputs.run }}
         run: |
-          # Pushes to main and manual runs check everything.
+          if [ -n "$TESTED_RUN" ]; then
+            printf 'backend=false\nfrontend=false\ninfra=false\narchitecture=false\n' >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # Other pushes to main and manual runs check everything.
           if [ "$EVENT_NAME" != "pull_request" ]; then
             printf 'backend=true\nfrontend=true\ninfra=true\narchitecture=true\n' >> "$GITHUB_OUTPUT"; exit 0
           fi
+          # If the diff base below changes, the `tested` step's reasoning must change with it: <base> is what the skipped
+          # jobs are compared with.
+          echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+          echo "base=$BASE_SHA" >> "$GITHUB_OUTPUT"
           files=$(git diff --name-only "$BASE_SHA" HEAD)
           # A change under .github/ can break any job, so it runs all of them (standard 05.3).
           workflows=$(echo "$files" | grep -Eq '^\.github/' && echo true || echo false)
@@ -317,3 +375,16 @@ jobs:
       - env:
           NEEDS: ${{ toJSON(needs) }}
         run: echo "$NEEDS" | jq -e 'all(.[]; .result == "success" or .result == "skipped")'
+      # A passed pull request run records the tree it tested and the commit its path filter compared with, in the
+      # artifact's name (see the `tested` step of `changes`). The file itself is not read.
+      - if: github.event_name == 'pull_request' && needs.changes.outputs.tree != ''
+        env:
+          TREE: ${{ needs.changes.outputs.tree }}
+          BASE: ${{ needs.changes.outputs.base }}
+        run: echo "Passed tree $TREE against $BASE" > "$RUNNER_TEMP/ci-passed.txt"
+      - if: github.event_name == 'pull_request' && needs.changes.outputs.tree != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-passed-${{ needs.changes.outputs.tree }}-${{ needs.changes.outputs.base }}
+          path: ${{ runner.temp }}/ci-passed.txt
+          retention-days: 30
