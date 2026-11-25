@@ -56,4 +56,4 @@ Without Aspire, regenerate `workspace.json` from the DSL with the same image the
 - Describe each relationship by why it exists ("Counts notes"), not only the protocol.
 - Positions are matched by element name. Renaming an element in the DSL drops its position; place it again in Structurizr.
 - A new view needs a description and a section above.
-- The image versions are in [Dockerfile](Dockerfile). When Dependabot raises them, run the export on that PR.
+- The image versions are in [Dockerfile](Dockerfile). When you raise them, run the export in the same PR.

@@ -32,7 +32,7 @@ Prod has its own project and registry, so the image is not pulled from sandbox: 
 
 ## Conventions worth knowing
 
-- Every GitHub Action is pinned to a full commit SHA with the version as a comment. Dependabot keeps the pins current. Pin
+- Every GitHub Action is pinned to a full commit SHA with the version as a comment. Raise the pins by hand; Dependabot opens no pull requests. Pin
   reusable workflows and Terraform modules to a tag or SHA, never `main`. The platform's `terraform.yml@main` is the exception
   its federation requires ([ADR 0013](../adrs/0013-cloud-run-behind-the-platform-gateway.md)).
 - Comments in code and Terraform explain why, not what. Longer reasoning belongs in an ADR.

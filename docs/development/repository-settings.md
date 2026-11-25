@@ -5,7 +5,7 @@ These cannot be set from the repository and are checked by hand when a repositor
 - Branch ruleset on `main`: pull requests only, required check `ci` (the aggregate job of the CI workflow), at least one approving
   review. The `ci` job includes the Semgrep `sast` job, so there is no separate code scanning check to require, and no CodeQL (it needs a paid licence on a private repository).
 - Secret scanning and push protection on.
-- Dependabot alerts and security updates on.
+- Dependabot alerts on, Dependabot security updates off (dependencies are updated by hand).
 - GitHub environments `sandbox`, `prod` (required reviewers), `dev` (for previews, allows PR branches, no required reviewers) and
   `preview` (collects the per-PR deployment records). The landing zone writes the variables of `sandbox`, `prod` and `dev`
   ([first-deploy runbook](../runbooks/first-deploy.md)). Limit the deployment branches of `sandbox` and `prod` to `main`: the
