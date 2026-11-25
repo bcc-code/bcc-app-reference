@@ -16,7 +16,7 @@ bcc-privacy and bcc-vote. One sample app, personal notes, shows every layer end 
 - **Quality guards**: warnings as errors, banned APIs at compile time, central package management with lock files, architecture tests,
   endpoint policy sweep, OpenAPI and client drift checks, i18n completeness, axe in the E2E tests.
 - **CI/CD**: one `ci` check (backend, integration, E2E on the AppHost, codegen and image, contracts, frontend, infra, C4, gitleaks,
-  Semgrep), build-once deploys through the BCC landing zone, PR previews, Dependabot with cooldown. Actions are pinned to SHAs.
+  Semgrep), build-once deploys through the BCC landing zone, PR previews, Dependabot config with cooldown (no automatic PRs). Actions are pinned to SHAs.
 - **Infrastructure**: Terraform for Cloud Run behind the platform gateway, shared Cloud SQL with IAM authentication, Pub/Sub, KMS,
   telemetry to the BCC collector, monitoring alerts with runbooks.
 - **Docs**: ADRs, C4 diagrams, runbooks, data inventory, tech-debt folder, Diátaxis stubs.
