@@ -195,6 +195,10 @@ which aggregates them and is the one check to require. The toolchain comes from 
 Actions minutes are billed per job, rounded up to a whole minute, and every job repeats setup. Add a short check as a step in a job
 that already runs (with a step-level `if:` on its path filter) rather than as a new job ([ADR 0030](docs/adrs/0030-fewer-ci-jobs-to-cut-billed-minutes.md)).
 There is no NuGet package cache on purpose: the packages are about 2 GB, and a restore from nuget.org takes 12–23 s.
+A workflow that runs on `pull_request` gets a top-level `concurrency` group per workflow and PR number with
+`cancel-in-progress: ${{ github.event_name == 'pull_request' }}`, so a new push cancels the superseded PR run while runs on `main`
+(which `deploy.yml` follows) and manual runs finish. `preview.yml` is the exception: it applies Terraform, so its runs are never
+cancelled, and GitHub replaces a run still waiting in its group instead. Side workflows that only check some files get a `paths` filter.
 
 A push to `main` skips the path-filtered jobs when a passed PR run recorded the same tree (artifact `ci-passed-<tree>-<base>`) and
 `<base>` is green on `main`; the run still succeeds, so `deploy.yml` starts as before. It needs a merge commit: a squash or rebase

@@ -25,6 +25,12 @@ on:
 
 permissions: {}
 
+# A newer push to a pull request cancels the older run; runs on main and manual runs are not cancelled. Keyed on the PR
+# number, as in ci.yml.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   supply-chain:
     permissions:
