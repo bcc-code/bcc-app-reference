@@ -52,24 +52,52 @@ jobs:
           echo "infra=$(has '^infra/')" >> "$GITHUB_OUTPUT"
           echo "architecture=$(has '^docs/architecture/')" >> "$GITHUB_OUTPUT"
 
+  # Build, unit and architecture tests, then the contract checks. The contract checks are steps here and not a job of their
+  # own: GitHub bills every job rounded up to a whole minute, and a job of its own repeated the whole setup. So the job
+  # runs for a frontend-only change too, and then only the contract steps do work.
   backend:
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      BACKEND: ${{ needs.changes.outputs.backend }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup
+        with:
+          frontend: 'true'
       # CI=true (set by GitHub Actions) turns on RestoreLockedMode in Directory.Build.props: the restore fails if a
       # packages.lock.json is out of date.
-      - run: dotnet restore BccCode.Template.slnx
-      - run: dotnet build BccCode.Template.slnx --no-restore
+      - id: restore
+        run: dotnet restore BccCode.Template.slnx
+      - if: env.BACKEND == 'true'
+        run: dotnet build BccCode.Template.slnx --no-restore
       # --long-running names a test that runs past 120 s, so a hang shows which test it is (standard 05.7). The unit tests need
       # no Docker; the architecture tests read the built assemblies.
-      - run: dotnet test --project api/tests/BccCode.Template.Tests --no-build --long-running 120 --results-directory TestResults/unit --report-trx
-      - run: dotnet test --project api/tests/BccCode.Template.ArchitectureTests --no-build --long-running 120 --results-directory TestResults/architecture --report-trx
+      - if: env.BACKEND == 'true'
+        run: dotnet test --project api/tests/BccCode.Template.Tests --no-build --long-running 120 --results-directory TestResults/unit --report-trx
+      - if: env.BACKEND == 'true'
+        run: dotnet test --project api/tests/BccCode.Template.ArchitectureTests --no-build --long-running 120 --results-directory TestResults/architecture --report-trx
       - name: Formatting and code style match .editorconfig
+        if: env.BACKEND == 'true'
         run: dotnet format BccCode.Template.slnx --verify-no-changes --no-restore || { echo "::error::Run dotnet format BccCode.Template.slnx and commit the result"; exit 1; }
+      # Contracts. They run even when a test or format step above failed, so one red run reports every finding, as the
+      # separate job did. Writes the OpenAPI document (Wolverine builds the host without starting it, so no database) and
+      # the client.
+      - id: generate
+        if: ${{ !cancelled() && steps.restore.outcome == 'success' }}
+        run: pnpm --dir frontend generate
+      - name: The committed OpenAPI document is current
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+        run: git diff --exit-code -- api/BccCode.Template.Api/BccCode.Template.Api.json || { echo "::error::Run pnpm --dir frontend generate and commit the result"; exit 1; }
+      - name: The generated client is current
+        if: ${{ !cancelled() && steps.generate.outcome == 'success' }}
+        run: git diff --exit-code -- frontend/src/client || { echo "::error::Run pnpm --dir frontend generate and commit frontend/src/client"; exit 1; }
+      # Same script as deploy.yml, so a broken SBOM step shows up on the PR. Not uploaded.
+      - name: SBOMs can be generated
+        if: ${{ !cancelled() && steps.restore.outcome == 'success' }}
+        run: bash .github/scripts/sbom.sh "${{ runner.temp }}/sbom" ci
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -184,26 +212,6 @@ jobs:
           trap 'docker logs api; docker rm -f api' EXIT
           curl --silent --show-error --fail --max-time 5 --retry 30 --retry-delay 1 --retry-all-errors http://127.0.0.1:8080/health
 
-  contracts:
-    needs: changes
-    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./.github/actions/setup
-        with:
-          frontend: 'true'
-      # Writes the OpenAPI document (Wolverine builds the host without starting it, so no database) and the client.
-      - run: pnpm --dir frontend generate
-      - name: The committed OpenAPI document is current
-        run: git diff --exit-code -- api/BccCode.Template.Api/BccCode.Template.Api.json || { echo "::error::Run pnpm --dir frontend generate and commit the result"; exit 1; }
-      - name: The generated client is current
-        run: git diff --exit-code -- frontend/src/client || { echo "::error::Run pnpm --dir frontend generate and commit frontend/src/client"; exit 1; }
-      # Same script as deploy.yml, so a broken SBOM step shows up on the PR. Not uploaded.
-      - name: SBOMs can be generated
-        run: bash .github/scripts/sbom.sh "${{ runner.temp }}/sbom" ci
-
   frontend:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
@@ -270,31 +278,29 @@ jobs:
       - name: The exported diagrams are current
         run: bash docs/architecture/export.sh --check || { echo "::error::Run docs/architecture/export.sh (or export.ps1) and commit docs/architecture/diagrams"; exit 1; }
 
-  # Runs on every change: a secret can be committed in any file.
-  gitleaks:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      # The CLI in a container: gitleaks-action needs a paid licence for organisation repositories. Only the PR's commits
-      # are scanned, with redacted output. Images are pinned by digest; Dependabot does not update images in run steps.
-      - env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}
-        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git /repo --redact --log-opts="$BASE_SHA..HEAD"
-
-  # SAST on every change (standard 17.10). Semgrep CE, not CodeQL: CodeQL needs the paid GitHub Code Security licence on a
-  # private repository.
+  # Secret scanning and SAST on every change: a secret can be committed in any file (standard 17.10). One job, because
+  # each scan takes seconds and GitHub bills every job rounded up to a whole minute.
   sast:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # The gitleaks CLI in a container: gitleaks-action needs a paid licence for organisation repositories. Only the PR's
+      # commits are scanned, with redacted output. Images are pinned by digest; Dependabot does not update images in run steps.
+      - name: Gitleaks
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD~1' }}
+        run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git /repo --redact --log-opts="$BASE_SHA..HEAD"
+      # Semgrep CE, not CodeQL: CodeQL needs the paid GitHub Code Security licence on a private repository. Runs even when
+      # gitleaks found something, so one red run reports both.
       # --error fails the job on any finding from these rule sets.
       # Excluded rule: npm-missing-minimum-release-age reads .npmrc only. The release-age quarantine is set in
       # frontend/pnpm-workspace.yaml (minimumReleaseAge), where pnpm reads it.
-      - run: >-
+      - name: Semgrep
+        if: ${{ !cancelled() }}
+        run: >-
           docker run --rm -v "$PWD:/src" -w /src
           semgrep/semgrep:1.180.0@sha256:529ee8a277ec8adc5b534d7c74eea0a47e9de21d62852b6ba7ac6ba9566845c3
           semgrep scan --metrics=off --error
@@ -304,7 +310,7 @@ jobs:
   # The one check to require in branch protection: skipped jobs count as passed, failed or cancelled ones do not.
   ci:
     if: always()
-    needs: [changes, backend, integration, e2e, codegen, contracts, frontend, infra, architecture, gitleaks, sast]
+    needs: [changes, backend, integration, e2e, codegen, frontend, infra, architecture, sast]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

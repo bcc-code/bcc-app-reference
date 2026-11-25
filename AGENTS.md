@@ -184,13 +184,17 @@ Each rule says why, and which test or guard enforces it (standard 24.3).
 ## CI
 
 `.github/workflows/ci.yml` (named `CI`) runs on every PR and on pushes to `main`: `backend` (locked restore, build, unit and architecture
-tests, `dotnet format --verify-no-changes`), `integration` (Testcontainers Postgres), `e2e` (frontend build, Playwright on the AppHost,
-traces uploaded on failure), `codegen` (Wolverine pre-generation, the Release container build, and the image's `db-apply`, `db-assert` and
-`/health` against Postgres), `contracts` (OpenAPI and client drift, SBOMs), `frontend` (checks in check mode), `infra` (`terraform fmt`,
-`init -backend=false`, `validate` for the three roots, `preview-decide.test.sh`), `architecture` (the C4 DSL validates and the SVGs were
-exported from it), `gitleaks`, `sast` (Semgrep CE; CodeQL needs a paid licence on a private repository) and `ci`, which aggregates them
-and is the one check to require. The toolchain comes from `.github/actions/setup`; its pnpm version must match `devEngines`.
-`supply-chain-security.yml` is separate.
+tests, `dotnet format --verify-no-changes`, then the contract checks: OpenAPI and client drift, SBOMs), `integration` (Testcontainers
+Postgres), `e2e` (frontend build, Playwright on the AppHost, traces uploaded on failure), `codegen` (Wolverine pre-generation, the Release
+container build, and the image's `db-apply`, `db-assert` and `/health` against Postgres), `frontend` (checks in check mode), `infra`
+(`terraform fmt`, `init -backend=false`, `validate` for the three roots, `preview-decide.test.sh`), `architecture` (the C4 DSL validates
+and the SVGs were exported from it), `sast` (gitleaks, then Semgrep CE; CodeQL needs a paid licence on a private repository) and `ci`,
+which aggregates them and is the one check to require. The toolchain comes from `.github/actions/setup`; its pnpm version must match
+`devEngines`. `supply-chain-security.yml` is separate.
+
+Actions minutes are billed per job, rounded up to a whole minute, and every job repeats setup. Add a short check as a step in a job
+that already runs (with a step-level `if:` on its path filter) rather than as a new job ([ADR 0030](docs/adrs/0030-fewer-ci-jobs-to-cut-billed-minutes.md)).
+There is no NuGet package cache on purpose: the packages are about 2 GB, and a restore from nuget.org takes 12–23 s.
 
 ## Deployment
 
