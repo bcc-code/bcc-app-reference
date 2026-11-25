@@ -69,14 +69,16 @@ traces and screenshots from CI when a test fails.
 
 The checks are defined in `.github/workflows/ci.yml`; run the same commands before you push:
 
-- Backend: locked `dotnet restore`, `dotnet build`, unit and architecture tests, and `dotnet format BccCode.Template.slnx --verify-no-changes`.
-- Frontend: `lint`, `format:check`, `type-check`, `test`, `knip`, `build`, and a check that the committed OpenAPI document and the
-  generated client are current ([contract flow](contract-flow.md)).
+- `backend`: locked `dotnet restore`, `dotnet build`, unit and architecture tests, and `dotnet format BccCode.Template.slnx --verify-no-changes`,
+  then a check that the committed OpenAPI document and the generated client are current ([contract flow](contract-flow.md)). On a
+  frontend-only change only the restore, the contract check and the SBOM check run.
+- `frontend`: `lint`, `format:check`, `type-check`, `test`, `knip`, `build`.
 - `codegen`: Wolverine code generation and a Release build ([ADR 0012](../adrs/0012-pre-generated-wolverine-code-in-production.md)).
 - `architecture`: the C4 DSL validates and `docs/architecture/export.sh --check` passes.
 - Terraform `fmt` and `validate` for `infra/`, `infra/preview` and `infra/preview-shared`, and `bash .github/scripts/preview-decide.test.sh`.
-- `gitleaks`, `sast` (Semgrep) and the supply-chain workflow.
+- `sast`: gitleaks and Semgrep; the supply-chain workflow is separate.
 - `integration` and `e2e`: the integration tests and the Playwright tests above, each in a job of its own.
-- `ci`: aggregates all jobs and is the one check to require.
+- `ci`: aggregates all jobs and is the one check to require. On a passed PR run it records the tested tree, so the push to `main`
+  after a merge commit can skip the jobs that already passed ([ADR 0030](../adrs/0030-fewer-ci-jobs-to-cut-billed-minutes.md)).
 
 Never delete, skip or weaken a test to make CI green. Fix the cause, or stop and report.
