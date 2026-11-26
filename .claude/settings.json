@@ -18,6 +18,16 @@
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/tools/worktree-cleanup/prune-volumes.mjs\" --dry-run",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/tools/cloud-session/non-developer.mjs\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/tools/cloud-session/prepare.mjs\"",
+            "timeout": 600
           }
         ]
       }
