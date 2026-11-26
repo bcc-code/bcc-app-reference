@@ -1,7 +1,7 @@
 ---
 name: non-developer
 description: How to work with a person who is not a developer and only uses Claude Code in the cloud (claude.ai/code) - plain language, Claude runs every command, shows screenshots of the running app, opens the pull request, adds a preview on request, never merges, and hands over to a developer when stuck. Use when a SessionStart hook says the person is not a developer (BCC_NON_DEVELOPER=true), or when the person says they are not a developer, cannot read code, or asks what a command or term means.
-allowed-tools: Bash(gh api:*) Bash(git:*) Bash(dotnet:*) Bash(pnpm:*) Bash(aspire:*) Bash(playwright-cli:*)
+allowed-tools: Bash(gh api:*) Bash(git:*) Bash(dotnet:*) Bash(pnpm:*) Bash(playwright-cli:*)
 ---
 
 # Working with a non-developer
@@ -32,8 +32,9 @@ yourself; it does not relax any rule.
    `dotnet format BccCode.Template.slnx --verify-no-changes`; the integration tests too when an endpoint, the database or
    persistence changed (they use Docker, which the cloud session has). An API change needs `pnpm --dir frontend generate`.
    Fix what fails. Never delete, skip or weaken a test to get past it.
-3. Show the result. Start the app with `aspire run --isolated` (the URLs come from `aspire describe`), sign in with the `user`
-   persona, and take screenshots of what changed with the `screenshot` skill. Show the screenshots and describe what they show.
+3. Show the result. Start the app with `dotnet aspire run --isolated` (in a cloud session the Aspire CLI is the repository's
+   local tool, so every `aspire …` command in `AGENTS.md` is `dotnet aspire …` here; the URLs come from
+   `dotnet aspire describe`), sign in with the `user` persona, and take screenshots of what changed with the `screenshot` skill. Show the screenshots and describe what they show.
    The person cannot open the app running in this session: the screenshots are how they see it.
 4. Ask whether it is what they wanted. Repeat from 1 until they say yes.
 5. Commit (an imperative subject, the body says why, in the words of `AGENTS.md`), push, and open the pull request (below).

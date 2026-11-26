@@ -45,8 +45,9 @@ cloud session: it runs against the OIDC mock and a local database.
    packages and the frontend packages. It skips the restore when the lock files have not changed, and tells Claude when the
    setup script has not run.
 3. The SessionStart hook `tools/cloud-session/non-developer.mjs` tells Claude to follow the `non-developer` skill.
-4. Claude makes the change, runs the checks, starts the app with `aspire run --isolated` (Docker runs inside the session) and
-   shows screenshots.
+4. Claude makes the change, runs the checks, starts the app with `dotnet aspire run --isolated` (Docker runs inside the
+   session) and shows screenshots. The Aspire CLI is the repository's local tool there, not a global `aspire`: a global one on
+   the PATH would need its own bundle, and the AppHost build otherwise gets it through `dnx`, as in CI.
 5. Claude opens the pull request with the GitHub REST API (the cloud's GitHub proxy rejects `gh pr`, which uses GraphQL). CI runs
    as for any pull request.
 6. When the person wants to show the change to someone else, Claude adds the `preview` label, which gives a public preview
@@ -59,12 +60,16 @@ on claude.ai; the work must be committed and pushed first) and runs `aspire run`
 
 ## Not yet checked in a cloud session
 
+Checked in a clean `ubuntu:24.04` container, the cloud's OS: the setup script, then the hook on an empty package cache (about
+2¼ minutes, including the retry of `dotnet tool restore` that dotnet/sdk#53783 needs), the full build, the unit and
+architecture tests, and the frontend type check and tests.
+
 The documentation of the cloud environment says Docker is available, but not whether these work there. Try them in the first
 session and update this page:
 
-- `aspire run --isolated` (the AppHost starts Postgres, the OIDC mock and Vite as containers and processes).
+- `dotnet aspire run --isolated` (the AppHost starts Postgres, the OIDC mock and Vite as containers and processes).
 - The integration tests (Testcontainers).
 - The E2E tests (`E2E_BROWSER_CHANNEL=chrome` with the image's Chrome for Testing) and the `screenshot` skill (`playwright-cli`).
 - Whether `builds.dotnet.microsoft.com` is needed, or `dot.net` alone is enough for the .NET install script.
-- How long the setup script and the first restore take. The setup cache only keeps a script that finishes in about five minutes;
-  a hook is stopped after ten.
+- How long the setup script and the first restore take on the cloud VM. The setup cache only keeps a script that finishes in
+  about five minutes; a hook is stopped after ten.

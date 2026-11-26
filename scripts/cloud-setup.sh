@@ -25,16 +25,12 @@ if ! "$DOTNET_DIR/dotnet" --list-sdks 2>/dev/null | grep -q "^${DOTNET_CHANNEL%x
   bash /tmp/dotnet-install.sh --channel "$DOTNET_CHANNEL" --install-dir "$DOTNET_DIR" --no-path
 fi
 ln -sf "$DOTNET_DIR/dotnet" /usr/local/bin/dotnet
+# The AppHost build (Aspire 17) gets the Aspire CLI bundle through dnx when no `aspire` is on the PATH, as in CI. Do not put an
+# `aspire` wrapper on the PATH: the build would pick it and fail with ASPIRE009. Run the CLI as `dotnet aspire` (a local tool).
+ln -sf "$DOTNET_DIR/dnx" /usr/local/bin/dnx
 # Built executables (the AppHost, the API) find the runtime through this file when DOTNET_ROOT is not set.
 mkdir -p /etc/dotnet
 echo "$DOTNET_DIR" > /etc/dotnet/install_location
-
-# The Aspire CLI is a local tool of the repository (.config/dotnet-tools.json), so `aspire` works from inside the checkout.
-cat > /usr/local/bin/aspire <<'EOF'
-#!/usr/bin/env bash
-exec dotnet aspire "$@"
-EOF
-chmod +x /usr/local/bin/aspire
 
 # Node, checked against the release's SHASUMS256.txt.
 if ! "$NODE_DIR/bin/node" --version 2>/dev/null | grep -q "^v$NODE_MAJOR\."; then

@@ -53,17 +53,23 @@ const marker = join(root, '.git', 'cloud-session-restored')
 if (existsSync(marker) && readFileSync(marker, 'utf8').trim() === digest) process.exit(0)
 
 const steps = [
-  ['dotnet', ['tool', 'restore']],
-  ['dotnet', ['restore', 'BccCode.Template.slnx', '--locked-mode']],
-  ['pnpm', ['--dir', 'frontend', 'install', '--frozen-lockfile']],
+  // dotnet/sdk#53783: on an empty NuGet cache (every new cloud VM) the first tool restore fails and the second succeeds. CI
+  // retries the same way (.github/actions/setup/action.yml).
+  { command: 'dotnet', args: ['tool', 'restore'], attempts: 2 },
+  { command: 'dotnet', args: ['restore', 'BccCode.Template.slnx', '--locked-mode'], attempts: 1 },
+  { command: 'pnpm', args: ['--dir', 'frontend', 'install', '--frozen-lockfile'], attempts: 1 },
 ]
-for (const [command, args] of steps) {
-  try {
-    run(command, args)
-  } catch (error) {
-    const output = `${error.stdout ?? ''}${error.stderr ?? ''}`.trim().split('\n').slice(-20).join('\n')
-    console.log(`Cloud session: \`${command} ${args.join(' ')}\` failed, so the packages are not restored.\n${output}`)
-    process.exit(0)
+for (const { command, args, attempts } of steps) {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      run(command, args)
+      break
+    } catch (error) {
+      if (attempt < attempts) continue
+      const output = `${error.stdout ?? ''}${error.stderr ?? ''}`.trim().split('\n').slice(-20).join('\n')
+      console.log(`Cloud session: \`${command} ${args.join(' ')}\` failed, so the packages are not restored.\n${output}`)
+      process.exit(0)
+    }
   }
 }
 writeFileSync(marker, digest)
