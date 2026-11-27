@@ -12,6 +12,7 @@ How to run, test and change the application locally, split by task (standard 23.
 | [Database and migrations](database-and-migrations.md) | EF Core migrations, versions and archiving, the schema step, the database snapshot, previews |
 | [Messaging locally](messaging-locally.md) | Internal messages, the local inbox and the durability pass |
 | [Repository settings](repository-settings.md) | What cannot be set from the repository |
+| [Non-developers](non-developers.md) | Letting a non-developer change the app through Claude Code in the cloud, and the cloud environment it needs |
 
 Other places: decisions in [adrs/](../adrs/README.md), operations in [runbooks/](../runbooks/README.md), previews in
 [pr-previews.md](../pr-previews.md), infrastructure in [../../infra/README.md](../../infra/README.md).

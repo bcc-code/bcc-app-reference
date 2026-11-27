@@ -276,6 +276,7 @@ Project skills are in `.claude/skills/` and agents in `.claude/agents/`.
 | `pr` | Opening a pull request, with before/after screenshots when the frontend changed. |
 | `permission-tests` | Writing or reviewing authorization tests: policy sweep, `PermissionConventionTests`, role population tests, ownership 403 and 404 tests. |
 | `writing-user-docs` | Writing end-user documentation in `docs/manual/` (Diátaxis). |
+| `non-developer` | The person in the session is not a developer (a SessionStart hook says so when `BCC_NON_DEVELOPER=true`). Setup: [non-developers](docs/development/non-developers.md). |
 | `clickup-tasks` | Filing work as ClickUp tasks. Fill in the skill's Config section first. |
 | `clickup-work` | Starting work from a ClickUp task id or link, and keeping the task in step with the PR. |
 
