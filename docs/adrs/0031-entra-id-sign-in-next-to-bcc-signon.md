@@ -79,7 +79,7 @@ An app can turn on BCC Signon, Entra ID, or both. Signon apps that do not config
 | | |
 |---|---|
 | Positive | An app picks its providers without code changes. Signon apps keep their data and roles. Staff sign in with their work account. Admins can be managed in the app without a deploy, and a revoke ends the person's sessions. |
-| Negative | Two schemes and a sign-in page to keep working. `person_identities` and `role_grants` are new personal data at rest (a pseudonymous subject, display name and sign-in times); they are in the [data inventory](../data-protection/data-inventory.md) and wait on the same erasure decisions. A person who uses both providers has two sets of data. Sessions written before this change lack `template:person`, so everyone signs in once more after the deploy. Entra sessions cannot be ended from Entra. |
+| Negative | Two schemes and a sign-in page to keep working. `person_identities` and `role_grants` are new personal data at rest (a pseudonymous subject, display name and sign-in times); they are in the [data inventory](../data-protection/data-inventory.md) and wait on the same erasure decisions. A person who uses both providers has two sets of data. Sessions written before this change lack `template:person`; the cookie handler rejects and removes such a session, so everyone signs in once more after the deploy. Entra sessions cannot be ended from Entra. |
 | Follow-up | Verify `amr` in a real tenant. Revisit account linking if an app needs one person across providers. |
 
 ## Deviations from the standards

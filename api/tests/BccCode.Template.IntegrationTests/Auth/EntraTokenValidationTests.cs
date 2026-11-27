@@ -26,9 +26,10 @@ public class EntraTokenValidationTests(AppFixture fixture) : AppTest(fixture)
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private static JwtSecurityToken Token(string? tenant, string subject = "entra-sub-tenant-test")
+    private static JwtSecurityToken Token(string? tenant, string subject = "entra-sub-tenant-test", string? oid = null, params string[] amr)
     {
-        List<Claim> claims = [new("sub", subject), new("oid", Guid.NewGuid().ToString()), new("name", "Tina Tenant"), new("amr", "pwd"), new("amr", "mfa")];
+        List<Claim> claims = [new("sub", subject), new("oid", oid ?? Guid.NewGuid().ToString()), new("name", "Tina Tenant")];
+        claims.AddRange((amr.Length > 0 ? amr : ["pwd", "mfa"]).Select(method => new Claim("amr", method)));
         if (tenant is not null) claims.Add(new Claim("tid", tenant));
         return new JwtSecurityToken(TestEntra.Issuer, TestEntra.ClientId, claims, signingCredentials: new SigningCredentials(Key, SecurityAlgorithms.RsaSha256));
     }
@@ -40,7 +41,8 @@ public class EntraTokenValidationTests(AppFixture fixture) : AppTest(fixture)
         var options = scope.ServiceProvider.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>().Get(EnabledProviders.EntraScheme);
         var http = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
         var scheme = new AuthenticationScheme(EnabledProviders.EntraScheme, null, typeof(OpenIdConnectHandler));
-        var principal = new ClaimsPrincipal(new ClaimsIdentity(token.Claims.Where(c => c.Type is "sub" or "name"), "oidc", "name", "role"));
+        // The principal of the real handler holds the claims of the ID token (amr included) except the ones its default claim actions delete.
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(token.Claims.Where(c => c.Type is not ("iss" or "aud" or "exp" or "nbf" or "iat")), "oidc", "name", "role"));
         var context = new TokenValidatedContext(http, scheme, options, principal, new AuthenticationProperties()) { SecurityToken = token };
 
         await options.Events.TokenValidated(context);
@@ -79,5 +81,43 @@ public class EntraTokenValidationTests(AppFixture fixture) : AppTest(fixture)
         context.Principal!.HasClaim(c => c.Type == AuthClaims.PersonId).Should().BeTrue();
         context.Principal.FindFirst(AuthClaims.Provider)!.Value.Should().Be(AuthProviders.Entra);
         (await IdentityCountAsync()).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task A_bootstrapped_entra_admin_without_mfa_in_amr_is_sent_to_the_second_factor_page_with_no_session()
+    {
+        var oid = Guid.NewGuid().ToString();
+        await using var host = await Fixture.StartProviderHostAsync(signon: true, entra: true, new Dictionary<string, string?> { ["Auth:BootstrapAdmins"] = $"entra:{oid}" });
+
+        var context = await ValidateAsync(host, Token(TestEntra.TenantId, oid: oid, amr: "pwd"));
+
+        context.Result!.Handled.Should().BeTrue();
+        context.Response.StatusCode.Should().Be(StatusCodes.Status302Found);
+        context.Response.Headers.Location.ToString().Should().Be("/auth/mfa-required");
+        context.Principal!.HasClaim(c => c.Type == AuthClaims.PersonId).Should().BeFalse("no session principal was set");
+    }
+
+    [Fact]
+    public async Task A_bootstrapped_entra_admin_with_mfa_in_amr_signs_in_as_an_administrator()
+    {
+        var oid = Guid.NewGuid().ToString();
+        await using var host = await Fixture.StartProviderHostAsync(signon: true, entra: true, new Dictionary<string, string?> { ["Auth:BootstrapAdmins"] = $"entra:{oid}" });
+
+        var context = await ValidateAsync(host, Token(TestEntra.TenantId, oid: oid, amr: ["pwd", "mfa"]));
+
+        context.Result.Should().BeNull();
+        context.Principal!.IsInRole("admin").Should().BeTrue();
+        context.Principal.HasClaim(AuthClaims.Mfa, "true").Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task An_entra_member_without_mfa_in_amr_signs_in_because_only_administrators_need_it()
+    {
+        await using var host = await Fixture.StartProviderHostAsync(signon: true, entra: true);
+
+        var context = await ValidateAsync(host, Token(TestEntra.TenantId, amr: "pwd"));
+
+        context.Result.Should().BeNull();
+        context.Principal!.IsInRole("admin").Should().BeFalse();
     }
 }

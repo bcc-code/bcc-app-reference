@@ -1,5 +1,6 @@
 using BccCode.Template.Api.Configuration;
 using BccCode.Template.Security;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
@@ -140,6 +141,15 @@ public static class AuthConfiguration
             var original = LocalRedirectGuard.SafeOrRoot($"{request.PathBase}{request.Path}{request.QueryString}");
             context.Response.Redirect($"{AuthEndpoints.SignInPath}?returnUrl={Uri.EscapeDataString(original)}");
             return Task.CompletedTask;
+        };
+        // A session written before the person id claim existed (ADR 0031) still authenticates, but the fallback policy would answer it 403
+        // for ever: the SPA only signs in again on 401, and sliding expiry keeps the ticket alive. So it is rejected, and signing out
+        // removes its row from the session store; the request is then challenged like one without a session. Claims only, no database read.
+        o.Events.OnValidatePrincipal = async context =>
+        {
+            if (context.Principal?.TryPersonId(out _) == true) return;
+            context.RejectPrincipal();
+            await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
         };
         o.Events.OnRedirectToAccessDenied = context =>
         {

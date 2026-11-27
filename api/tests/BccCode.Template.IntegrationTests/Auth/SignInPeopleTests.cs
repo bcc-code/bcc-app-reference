@@ -216,4 +216,30 @@ public class SignInPeopleTests(AppFixture fixture) : AppTest(fixture)
         (await db.PersonIdentities.AsNoTracking().SingleAsync(i => i.Subject == "long", Ct)).DisplayName.Should().HaveLength(PersonIdentity.MaxDisplayNameLength);
         (await db.PersonIdentities.AsNoTracking().SingleAsync(i => i.Subject == "none", Ct)).DisplayName.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task A_signon_identity_that_comes_back_with_another_person_uid_is_brought_into_line_with_it()
+    {
+        var people = People();
+        var (first, second) = (Guid.NewGuid(), Guid.NewGuid());
+        await people.RecordAsync(Signon(first, subject: "moved-sub"), Ct);
+
+        var result = await people.RecordAsync(Signon(second, subject: "moved-sub"), Ct);
+
+        result.PersonId.Should().Be(second);
+        await using var db = Fixture.NewDb();
+        var row = await db.PersonIdentities.AsNoTracking().SingleAsync(Ct);
+        (row.PersonId, row.Version).Should().Be((second, 2));
+    }
+
+    [Fact]
+    public async Task An_entra_identity_keeps_the_person_id_it_was_issued()
+    {
+        var people = People();
+        var issued = (await people.RecordAsync(Entra(subject: "stable-sub"), Ct)).PersonId;
+
+        var again = await people.RecordAsync(Entra(subject: "stable-sub"), Ct);
+
+        again.PersonId.Should().Be(issued);
+    }
 }

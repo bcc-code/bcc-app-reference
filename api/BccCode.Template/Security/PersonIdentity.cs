@@ -53,9 +53,17 @@ public class PersonIdentity
         };
     }
 
-    public void RecordSignIn(string? displayName, string issuer, DateTimeOffset now)
+    /// <param name="displayName">The name claim of this sign-in.</param>
+    /// <param name="issuer">The <c>iss</c> of this sign-in.</param>
+    /// <param name="now">The time of the sign-in.</param>
+    /// <param name="signonPersonId">
+    /// BCC Signon's <c>personUid</c> of this sign-in. The person id of a Signon identity is that uid, so a row that holds another one is
+    /// brought into line with it. Null for an Entra identity, whose person id the app issued and never changes.
+    /// </param>
+    public void RecordSignIn(string? displayName, string issuer, DateTimeOffset now, Guid? signonPersonId = null)
     {
         (DisplayName, Issuer, LastSignInAt) = (Clean(displayName), issuer, now);
+        if (signonPersonId is { } personId) PersonId = personId;
         Version++;
     }
 

@@ -20,6 +20,14 @@ public sealed record TestUser(Guid PersonId, string Name, bool Mfa, params strin
     /// <summary>The provider the session came from (<see cref="AuthProviders"/>); logout signs out of its scheme.</summary>
     public string Provider { get; init; } = AuthProviders.BccSignon;
 
+    /// <summary>A session as written before the person id claim existed: it has the Signon <c>personUid</c> claim and neither <c>template:person</c> nor a provider.</summary>
+    public bool Legacy { get; init; }
+
+    public static TestUser NewLegacy()
+    {
+        return new TestUser(Guid.NewGuid(), "Legacy User", Mfa: true) { Legacy = true };
+    }
+
     public static TestUser New(string name = "Test User", params string[] roles)
     {
         return new(Guid.NewGuid(), name, Mfa: true, roles);
@@ -53,7 +61,7 @@ public sealed record TestUser(Guid PersonId, string Name, bool Mfa, params strin
     }
 
     /// <summary>Two users with the same person, name, second factor, roles and provider share a session on a host.</summary>
-    internal string CacheKey => $"{PersonId}|{Name}|{string.Join(',', Roles)}|{Mfa}|{Provider}";
+    internal string CacheKey => $"{PersonId}|{Name}|{string.Join(',', Roles)}|{Mfa}|{Provider}|{Legacy}";
 }
 
 /// <summary>
@@ -89,10 +97,10 @@ public static class TestSessions
             new(AuthClaims.Name, user.Name),
             new(AuthClaims.Subject, person),
             new(AuthClaims.Issuer, issuer),
-            new(AuthClaims.PersonId, person),
-            new(AuthClaims.Provider, user.Provider),
             new(AuthClaims.SessionId, TestUser.SidOf(person)),
         };
+        if (user.Legacy) claims.Add(new Claim(AuthClaims.SignonPersonUid, person));
+        else claims.AddRange([new Claim(AuthClaims.PersonId, person), new Claim(AuthClaims.Provider, user.Provider)]);
         claims.AddRange(user.Roles.Select(role => new Claim(AuthClaims.Role, role)));
         if (user.Mfa) claims.Add(new Claim(AuthClaims.Mfa, "true"));
         var now = DateTimeOffset.UtcNow;

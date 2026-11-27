@@ -60,13 +60,13 @@ public sealed class SignInPeople(IDbContextFactory<TemplateDb> factory, TimeProv
             }
             else
             {
-                identity.RecordSignIn(request.DisplayName, request.Issuer, now);
+                identity.RecordSignIn(request.DisplayName, request.Issuer, now, request.SignonPersonUid);
             }
 
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
-                // BCC Signon's person uid is the person id, so data keyed by it keeps its owner whatever an older row says.
+                // BCC Signon's person uid is the person id (the row was brought into line with it above), so data keyed by it keeps its owner.
                 return request.SignonPersonUid ?? identity.PersonId;
             }
             catch (DbUpdateException ex) when (attempt < MAX_ATTEMPTS && IsUniqueViolation(ex))

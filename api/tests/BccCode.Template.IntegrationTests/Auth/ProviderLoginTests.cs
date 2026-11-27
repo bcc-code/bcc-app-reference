@@ -1,6 +1,7 @@
 using BccCode.Template.IntegrationTests.Infrastructure;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -219,5 +220,43 @@ public class ProviderLoginTests(AppFixture fixture) : AppTest(fixture)
             s.Post.FormData(new Dictionary<string, string> { ["logout_token"] = TestOidc.LogoutToken() }).ToUrl("/auth/backchannel-logout");
             s.StatusCodeShouldBe(400);
         });
+    }
+
+    private async Task<int> SessionRowsOfAsync(TestUser user)
+    {
+        await using var db = Fixture.NewDb();
+        return await db.AuthSessions.CountAsync(r => r.Subject == user.PersonId.ToString(), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task A_session_from_before_the_person_id_claim_gets_401_on_the_api_and_its_row_is_removed()
+    {
+        var legacy = TestUser.NewLegacy();
+        var cookie = await TestSessions.CreateAsync(Host, legacy);
+        (await SessionRowsOfAsync(legacy)).Should().Be(1);
+
+        await Host.Scenario(s => { s.WithRequestHeader("Cookie", cookie); s.Get.Url("/api/me"); s.StatusCodeShouldBe(401); });
+
+        (await SessionRowsOfAsync(legacy)).Should().Be(0, "signing out of the rejected session removes it from the store");
+    }
+
+    [Fact]
+    public async Task A_session_from_before_the_person_id_claim_is_sent_to_sign_in_again_on_a_navigation()
+    {
+        var legacy = TestUser.NewLegacy();
+        var cookie = await TestSessions.CreateAsync(Host, legacy);
+
+        var result = await Host.Scenario(s => { s.WithRequestHeader("Cookie", cookie); s.Get.Url("/"); s.StatusCodeShouldBe(302); });
+
+        LocationOf(result).Should().StartWith(TestOidc.AuthorizationEndpoint, "Signon only: straight to the provider, not a 403");
+        (await SessionRowsOfAsync(legacy)).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_session_from_before_the_person_id_claim_cannot_log_out_with_a_403_either()
+    {
+        var cookie = await TestSessions.CreateAsync(Host, TestUser.NewLegacy());
+
+        await Host.Scenario(s => { s.WithRequestHeader("Cookie", cookie); s.AsBrowser(); s.Post.Url("/auth/logout"); s.StatusCodeShouldBe(401); });
     }
 }
