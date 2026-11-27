@@ -2,6 +2,7 @@
 import { useQuery } from '@tanstack/vue-query'
 import { useI18n } from 'vue-i18n'
 import ProblemMessage from '@/components/ProblemMessage.vue'
+import PeopleSection from './PeopleSection.vue'
 import { adminQueries } from './queries'
 
 const { t, n } = useI18n()
@@ -23,5 +24,6 @@ const { data: stats, error, isPending } = useQuery(adminQueries.stats())
         <dd class="m-0 heading-lg" data-testid="stats-archived">{{ n(stats.archivedNotes) }}</dd>
       </div>
     </dl>
+    <PeopleSection />
   </section>
 </template>

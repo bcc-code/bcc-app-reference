@@ -101,15 +101,17 @@ public class SessionClaimsTests
         return new ClaimsPrincipal(new ClaimsIdentity(claims, "oidc"));
     }
 
+    private const string SIGNON_UID = "a0000000-0000-4000-8000-000000000001";
+
     [Fact]
     public void Slimming_keeps_what_the_app_reads()
     {
-        var principal = Token(new("sub", "subject-1"), new(AuthClaims.PersonUid, "a0000000-0000-4000-8000-000000000001"), new("name", "N"), new("role", "admin"),
-            new("email", "x@example.test"), new("birthdate", "2000-01-01"));
+        var principal = Token(new("sub", "subject-1"), new(AuthClaims.PersonId, SIGNON_UID), new("name", "N"), new("role", "admin"),
+            new(AuthClaims.SignonPersonUid, SIGNON_UID), new("email", "x@example.test"), new("birthdate", "2000-01-01"));
 
         var slim = SessionClaims.Slim(principal);
 
-        slim.Claims.Select(c => c.Type).Should().BeEquivalentTo("sub", AuthClaims.PersonUid, "name", "role");
+        slim.Claims.Select(c => c.Type).Should().BeEquivalentTo("sub", AuthClaims.PersonId, "name", "role");
         slim.IsInRole("admin").Should().BeTrue();
         slim.Identity!.Name.Should().Be("N");
     }
@@ -117,20 +119,20 @@ public class SessionClaimsTests
     [Fact]
     public void A_token_without_a_person_uid_or_a_subject_is_refused()
     {
-        SessionClaims.FromIdToken(Token(new Claim("sub", "s")), "https://idp.example").Should().BeNull();
-        SessionClaims.FromIdToken(Token(new Claim(AuthClaims.PersonUid, "a0000000-0000-4000-8000-000000000001")), "https://idp.example").Should().BeNull();
+        SessionClaims.FromIdToken(Token(new Claim("sub", "s")), "https://idp.example", AuthProviders.BccSignon).Should().BeNull();
+        SessionClaims.FromIdToken(Token(new Claim(AuthClaims.SignonPersonUid, SIGNON_UID)), "https://idp.example", AuthProviders.BccSignon).Should().BeNull();
     }
 
     [Fact]
     public void The_issuer_is_added_and_mfa_is_set_from_amr_only()
     {
-        var withMfa = Token(new("sub", "s"), new(AuthClaims.PersonUid, "a0000000-0000-4000-8000-000000000001"), new("amr", "pwd"), new("amr", "mfa"));
-        var withoutMfa = Token(new("sub", "s"), new(AuthClaims.PersonUid, "a0000000-0000-4000-8000-000000000001"), new("amr", "pwd"));
-        var forged = Token(new("sub", "s"), new(AuthClaims.PersonUid, "a0000000-0000-4000-8000-000000000001"), new(AuthClaims.Mfa, "true"));
+        var withMfa = Token(new("sub", "s"), new(AuthClaims.SignonPersonUid, SIGNON_UID), new("amr", "pwd"), new("amr", "mfa"));
+        var withoutMfa = Token(new("sub", "s"), new(AuthClaims.SignonPersonUid, SIGNON_UID), new("amr", "pwd"));
+        var forged = Token(new("sub", "s"), new(AuthClaims.SignonPersonUid, SIGNON_UID), new(AuthClaims.Mfa, "true"));
 
-        SessionClaims.FromIdToken(withMfa, "https://idp.example")!.FindFirst(AuthClaims.Issuer)!.Value.Should().Be("https://idp.example");
-        SessionClaims.FromIdToken(withMfa, "https://idp.example")!.HasClaim(AuthClaims.Mfa, "true").Should().BeTrue();
-        SessionClaims.FromIdToken(withoutMfa, "https://idp.example")!.HasClaim(c => c.Type == AuthClaims.Mfa).Should().BeFalse();
-        SessionClaims.FromIdToken(forged, "https://idp.example")!.HasClaim(c => c.Type == AuthClaims.Mfa).Should().BeFalse("only the app sets it");
+        SessionClaims.FromIdToken(withMfa, "https://idp.example", AuthProviders.BccSignon)!.FindFirst(AuthClaims.Issuer)!.Value.Should().Be("https://idp.example");
+        SessionClaims.FromIdToken(withMfa, "https://idp.example", AuthProviders.BccSignon)!.HasClaim(AuthClaims.Mfa, "true").Should().BeTrue();
+        SessionClaims.FromIdToken(withoutMfa, "https://idp.example", AuthProviders.BccSignon)!.HasClaim(c => c.Type == AuthClaims.Mfa).Should().BeFalse();
+        SessionClaims.FromIdToken(forged, "https://idp.example", AuthProviders.BccSignon)!.HasClaim(c => c.Type == AuthClaims.Mfa).Should().BeFalse("only the app sets it");
     }
 }

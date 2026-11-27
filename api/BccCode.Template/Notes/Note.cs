@@ -1,7 +1,7 @@
 namespace BccCode.Template.Notes;
 
 /// <summary>
-/// A note of one person; the owner is the BCC person uid. The setters are private: the state changes only through
+/// A note of one person; the owner is the person id (ADR 0031). The setters are private: the state changes only through
 /// <see cref="Create"/>, <see cref="Edit"/> and <see cref="Archive"/>, which keep <see cref="Version"/> moving. The version is
 /// the concurrency token, and the client sends it back to prove it edited the latest. Never returned from an endpoint.
 /// </summary>

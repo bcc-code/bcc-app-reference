@@ -15,8 +15,19 @@ namespace BccCode.Template.IntegrationTests.Infrastructure;
 /// /api. A user is a person the test makes up (<see cref="New"/>, so tests that share a database do not see each other's notes) or
 /// a persona of the OIDC mock (<see cref="Of"/>, whose uid is the one the seeder writes notes for).
 /// </summary>
-public sealed record TestUser(Guid PersonUid, string Name, bool Mfa, params string[] Roles)
+public sealed record TestUser(Guid PersonId, string Name, bool Mfa, params string[] Roles)
 {
+    /// <summary>The provider the session came from (<see cref="AuthProviders"/>); logout signs out of its scheme.</summary>
+    public string Provider { get; init; } = AuthProviders.BccSignon;
+
+    /// <summary>A session as written before the person id claim existed: it has the Signon <c>personUid</c> claim and neither <c>template:person</c> nor a provider.</summary>
+    public bool Legacy { get; init; }
+
+    public static TestUser NewLegacy()
+    {
+        return new TestUser(Guid.NewGuid(), "Legacy User", Mfa: true) { Legacy = true };
+    }
+
     public static TestUser New(string name = "Test User", params string[] roles)
     {
         return new(Guid.NewGuid(), name, Mfa: true, roles);
@@ -32,6 +43,12 @@ public sealed record TestUser(Guid PersonUid, string Name, bool Mfa, params stri
         return new(Guid.NewGuid(), "Test Admin", Mfa: false, "admin");
     }
 
+    /// <summary>A person who signed in with Entra, so the session says so.</summary>
+    public static TestUser NewEntra(string name = "Test Entra User", params string[] roles)
+    {
+        return new(Guid.NewGuid(), name, Mfa: true, roles) { Provider = AuthProviders.Entra };
+    }
+
     public static TestUser Of(Persona persona)
     {
         return new(Guid.Parse(persona.PersonUid), persona.Name, persona.Mfa, persona.Roles);
@@ -43,8 +60,8 @@ public sealed record TestUser(Guid PersonUid, string Name, bool Mfa, params stri
         return $"test-sid-{personUid}";
     }
 
-    /// <summary>Two users with the same person, name, second factor and roles share a session on a host.</summary>
-    internal string CacheKey => $"{PersonUid}|{Name}|{string.Join(',', Roles)}|{Mfa}";
+    /// <summary>Two users with the same person, name, second factor, roles and provider share a session on a host.</summary>
+    internal string CacheKey => $"{PersonId}|{Name}|{string.Join(',', Roles)}|{Mfa}|{Provider}|{Legacy}";
 }
 
 /// <summary>
@@ -74,15 +91,16 @@ public static class TestSessions
     {
         var scheme = CookieAuthenticationDefaults.AuthenticationScheme;
         var options = host.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>().Get(scheme);
-        var person = user.PersonUid.ToString();
+        var person = user.PersonId.ToString();
         var claims = new List<Claim>
         {
             new(AuthClaims.Name, user.Name),
             new(AuthClaims.Subject, person),
             new(AuthClaims.Issuer, issuer),
-            new(AuthClaims.PersonUid, person),
             new(AuthClaims.SessionId, TestUser.SidOf(person)),
         };
+        if (user.Legacy) claims.Add(new Claim(AuthClaims.SignonPersonUid, person));
+        else claims.AddRange([new Claim(AuthClaims.PersonId, person), new Claim(AuthClaims.Provider, user.Provider)]);
         claims.AddRange(user.Roles.Select(role => new Claim(AuthClaims.Role, role)));
         if (user.Mfa) claims.Add(new Claim(AuthClaims.Mfa, "true"));
         var now = DateTimeOffset.UtcNow;

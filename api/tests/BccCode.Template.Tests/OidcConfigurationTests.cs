@@ -23,7 +23,7 @@ public class OidcConfigurationTests
     [InlineData("Preview")]
     public void A_deployed_environment_without_oidc_settings_fails_at_startup(string environment)
     {
-        var act = () => AuthConfiguration.ValidateOidc(Settings(), Environment(environment));
+        var act = () => AuthConfiguration.ValidateProviders(Settings(), Environment(environment));
 
         act.Should().Throw<InvalidOperationException>().Which.Message
             .Should().Contain("Oidc:Authority").And.Contain("Oidc:ClientId").And.Contain("Oidc:ClientSecret");
@@ -32,7 +32,7 @@ public class OidcConfigurationTests
     [Fact]
     public void Each_missing_setting_is_named()
     {
-        var act = () => AuthConfiguration.ValidateOidc(
+        var act = () => AuthConfiguration.ValidateProviders(
             Settings(("Oidc:Authority", "https://login.example"), ("Oidc:ClientId", "template"), ("Oidc:ClientSecret", " ")), Environment("Production"));
 
         act.Should().Throw<InvalidOperationException>().Which.Message.Should().Contain("Oidc:ClientSecret").And.NotContain("Oidc:Authority");
@@ -43,7 +43,7 @@ public class OidcConfigurationTests
     [InlineData("Test")]
     public void Development_and_test_need_no_settings(string environment)
     {
-        var act = () => AuthConfiguration.ValidateOidc(Settings(), Environment(environment));
+        var act = () => AuthConfiguration.ValidateProviders(Settings(), Environment(environment));
 
         act.Should().NotThrow();
     }
@@ -53,7 +53,7 @@ public class OidcConfigurationTests
     {
         var settings = Settings(("Oidc:Authority", "https://login.example"), ("Oidc:ClientId", "template"), ("Oidc:ClientSecret", "from-secret-manager"));
 
-        var act = () => AuthConfiguration.ValidateOidc(settings, Environment("Production"));
+        var act = () => AuthConfiguration.ValidateProviders(settings, Environment("Production"));
 
         act.Should().NotThrow();
     }

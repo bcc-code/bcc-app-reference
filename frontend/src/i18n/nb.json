@@ -34,6 +34,30 @@
       "title": "Statistikk",
       "activeNotes": "Aktive notater",
       "archivedNotes": "Arkiverte notater"
+    },
+    "people": {
+      "title": "Administratorer",
+      "search": "Søk etter navn",
+      "searchButton": "Søk",
+      "empty": "Ingen har logget inn ennå, eller ingen passer med søket.",
+      "unnamed": "(uten navn)",
+      "columns": {
+        "name": "Navn",
+        "provider": "Logget inn med",
+        "lastSignIn": "Siste innlogging",
+        "admin": "Administrator",
+        "actions": "Handlinger"
+      },
+      "provider": {
+        "bccSignon": "BCC Signon",
+        "entra": "Microsoft Entra",
+        "other": "Annen"
+      },
+      "yes": "Ja",
+      "no": "Nei",
+      "grantFor": "Gjør {name} til administrator",
+      "revokeFor": "Fjern {name} som administrator",
+      "grantNote": "En ny administrator får rollen neste gang vedkommende logger inn. Når rollen fjernes, logges personen ut med en gang."
     }
   },
   "noAccess": {
@@ -60,6 +84,9 @@
       "titleRequired": "Skriv inn en tittel.",
       "titleTooLong": "Tittelen kan være på høyst 200 tegn.",
       "bodyTooLong": "Teksten kan være på høyst 10 000 tegn."
+    },
+    "admin": {
+      "cannotRevokeSelf": "Du kan ikke fjerne deg selv som administrator."
     }
   },
   "layout": {

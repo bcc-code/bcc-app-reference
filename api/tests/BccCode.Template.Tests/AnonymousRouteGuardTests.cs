@@ -34,4 +34,20 @@ public class AnonymousRouteGuardTests
     {
         AnonymousRouteGuard.FindViolations([Endpoint("/Auth/Login", new AllowAnonymousAttribute())], AnonymousRouteGuard.Allowed).Should().BeEmpty();
     }
+
+    [Fact]
+    public void The_sign_in_routes_of_both_providers_are_allowed_and_nothing_next_to_them_is()
+    {
+        var violations = AnonymousRouteGuard.FindViolations(
+            [
+                Endpoint("/auth/login", new AllowAnonymousAttribute()),
+                Endpoint("/auth/login/{provider}", new AllowAnonymousAttribute()),
+                Endpoint("/auth/sign-in", new AllowAnonymousAttribute()),
+                Endpoint("/auth/login/entra", new AllowAnonymousAttribute()),
+                Endpoint("/auth/logout", new AllowAnonymousAttribute()),
+            ],
+            AnonymousRouteGuard.Allowed);
+
+        violations.Should().Equal("/auth/login/entra", "/auth/logout");
+    }
 }

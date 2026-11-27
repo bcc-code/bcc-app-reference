@@ -22,7 +22,7 @@ the API, the frontend dev server and the C4 workspace viewer. No secret or `.env
 emulator ([messaging locally](messaging-locally.md)). `aspire describe` prints the real URLs and ports of the running
 resources, and the dashboard lists them. The fixed ports of the sole instance are in the ports table in [AGENTS.md](../../AGENTS.md).
 
-The seeder waits for the schema step and runs once (`Seeder:Once`); the API waits for both. Log in by picking a
+The seeder waits for the schema step and runs once (`Seeder:Once`); the API waits for both. Open the app and pick the provider on the sign-in page (BCC Signon or Microsoft Entra, both served by the mock), then pick a
 [persona](personas.md).
 
 The browser talks to one HTTPS origin. The API proxies the Vite dev server, so cookies, the cross-origin check and the content

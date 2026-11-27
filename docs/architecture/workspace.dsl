@@ -4,10 +4,11 @@ workspace "Template application" "C4 model of the BCC application template (the 
 
     model {
         user = person "Signed-in user" "Keeps personal notes."
-        admin = person "Administrator" "Reads note statistics. Signs in with MFA."
+        admin = person "Administrator" "Reads note statistics and manages who is an administrator. Signs in with MFA."
 
         group "BCC Platform" {
             bccSignon = softwareSystem "BCC Signon" "login.bcc.no (Auth0). Signs users in and ends their sessions centrally." "External"
+            entraId = softwareSystem "Microsoft Entra ID" "The BCC Microsoft tenant. Signs staff in where an environment turns Entra on (ADR 0031)." "External"
             bccPubSub = softwareSystem "BCC PubSub" "Event bus for integration events. The sample sends none." "External"
         }
 
@@ -16,7 +17,7 @@ workspace "Template application" "C4 model of the BCC application template (the 
             api = container "API" "Serves the API under /api and the SPA's index.html. Signs users in as a BFF with server-side sessions." ".NET 11, Wolverine.HTTP, EF Core" {
                 notes = component "Notes" "Create, edit and archive a person's notes. A note the caller cannot see answers 404."
                 currentUser = component "Current user" "Who is signed in, and their roles."
-                adminStats = component "Admin" "Note counts for administrators."
+                adminStats = component "Admin" "Note counts, and the list of people who signed in with grant and revoke of the admin role, for administrators."
             }
             messages = container "Message topic" "Internal messages between the API's own handlers, pushed back to the API. Locally the durable inbox does this." "Google Pub/Sub" "Queue"
             database = container "Database" "Notes, sessions, Data Protection keys, and Wolverine's outbox, inbox and dead letters." "PostgreSQL" "Database"
@@ -28,6 +29,7 @@ workspace "Template application" "C4 model of the BCC application template (the 
         app.frontend -> app.api "Reads and writes data" "HTTPS, JSON"
 
         app.api -> bccSignon "Signs users in (BFF, session cookie, PKCE and PAR)" "OIDC"
+        app.api -> entraId "Signs staff in where Entra is on (BFF, session cookie, PKCE)" "OIDC"
         bccSignon -> app.api "Ends sessions at /auth/backchannel-logout" "HTTPS, signed logout token"
         app.api -> app.database "Reads and writes" "SQL"
         app.api -> app.messages "Publishes internal messages after commit" "Google Pub/Sub"
@@ -49,7 +51,7 @@ workspace "Template application" "C4 model of the BCC application template (the 
                     postgres = deploymentNode "PostgreSQL container" "" "Docker" {
                         databaseInstance = containerInstance app.database
                     }
-                    mocks = infrastructureNode "OIDC mock" "api/OidcMock stands in for BCC Signon with test personas. No Pub/Sub locally: internal messages run from the durable inbox, and the AppHost calls the durability pass in a loop." ".NET 11"
+                    mocks = infrastructureNode "OIDC mock" "api/OidcMock stands in for BCC Signon and Entra ID with test personas. No Pub/Sub locally: internal messages run from the durable inbox, and the AppHost calls the durability pass in a loop." ".NET 11"
                 }
             }
         }

@@ -1,3 +1,4 @@
+using BccCode.Template.Api.Auth;
 using BccCode.Template.Persistence;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Hosting;
@@ -123,6 +124,31 @@ public sealed class AppFixture(PostgresFixture postgres) : IAsyncLifetime
         return string.Join("\nUNION ALL ", checks);
     }
 
+    /// <summary>
+    /// Another host with BCC Signon, Entra or both switched on, as production decides it from the settings: the Signon settings are
+    /// left out of the host that has no Signon, and the Entra tenant and client are set for the one that has Entra (its authority is
+    /// the fake <see cref="TestEntra"/> one, which Test hosts may override).
+    /// </summary>
+    public Task<IAlbaHost> StartProviderHostAsync(bool signon, bool entra, IReadOnlyDictionary<string, string?>? settings = null)
+    {
+        var all = new Dictionary<string, string?>();
+        if (!signon)
+        {
+            all["Oidc:Authority"] = null;
+            all["Oidc:ClientId"] = null;
+        }
+
+        if (entra)
+        {
+            all["Entra:TenantId"] = TestEntra.TenantId;
+            all["Entra:ClientId"] = TestEntra.ClientId;
+            all["Entra:Authority"] = TestEntra.Issuer;
+        }
+
+        foreach (var (key, value) in settings ?? new Dictionary<string, string?>()) all[key] = value;
+        return StartHostAsync(all);
+    }
+
     /// <summary>Another host on the same database, for a test that changes configuration.</summary>
     public async Task<IAlbaHost> StartHostAsync(IReadOnlyDictionary<string, string?>? settings = null, Action<IServiceCollection>? services = null)
     {
@@ -150,6 +176,8 @@ public sealed class AppFixture(PostgresFixture postgres) : IAsyncLifetime
                     // No metadata fetch: the sign-in redirect and the back-channel logout validation use this configuration.
                     collection.PostConfigure<OpenIdConnectOptions>(OpenIdConnectDefaults.AuthenticationScheme,
                         o => o.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(TestOidc.Configuration()));
+                    collection.PostConfigure<OpenIdConnectOptions>(EnabledProviders.EntraScheme,
+                        o => o.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(TestEntra.Configuration()));
                     services?.Invoke(collection);
                 });
             })

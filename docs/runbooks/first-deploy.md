@@ -28,7 +28,9 @@ The workflow has to be on `main` before it can be run. If the deploy workflow ru
 
 ## 3. Set up sign-in
 
-The app signs users in through BCC Signon (Auth0) with a confidential client ([ADR 0019](../adrs/0019-bff-sign-in-with-bcc-signon.md)). Do this before the first deploy; the apply fails on purpose while the client id or the secret is missing.
+The app signs users in through BCC Signon (Auth0) with a confidential client ([ADR 0019](../adrs/0019-bff-sign-in-with-bcc-signon.md)), through Microsoft Entra ID, or both ([ADR 0031](../adrs/0031-entra-id-sign-in-next-to-bcc-signon.md)). Sandbox and prod have Signon on and Entra off until `entra_by_environment` is filled in. Do this before the first deploy; the apply fails on purpose while the client id of a provider that is on, or its secret, is missing, and when no provider is on.
+
+The BCC Signon steps come first; the Entra steps follow under [Entra ID](#entra-id-optional).
 
 **Client.** In BCC Signon create a client for the environment:
 
@@ -57,6 +59,46 @@ unset OIDC_CLIENT_SECRET
 
 The secret id must stay `<app>-oidc-client-secret` (`infra/secrets.tf`). Terraform only reads it and grants the runtime account access to this one secret. To rotate: add a new version the same way, then roll out a new revision (the service reads `latest` at instance start).
 
+### Entra ID (optional)
+
+Do this only for an environment whose users sign in with the BCC Microsoft tenant. Ask the tenant administrator for the registration, or make it yourself with the right to register applications. One registration per environment, never shared.
+
+| Setting | Value |
+|---|---|
+| Supported account types | Single tenant (accounts in this organizational directory only) |
+| Assignment required | Yes, on the enterprise application of the registration (Properties, "Assignment required?"), and assign the staff group or the users. A single-tenant registration otherwise admits every account of the tenant, B2B guests included, and their `tid` is the app's tenant, so the app's tenant check does not exclude them |
+| Platform | Web |
+| Redirect URI | `https://<host>/signin-entra` |
+| Front-channel logout URL | none needed: the app signs out through its own `POST /auth/logout`; Entra has no back-channel logout for it |
+| Post-logout redirect URI | `https://<host>/signout-callback-entra` |
+| API permissions | the default `User.Read` is enough; the app reads `openid profile` only and stores no email |
+| Client secret | create one (certificates are not supported by the app) and copy the value once |
+
+`<host>` is the gateway host name, as for Signon. Then:
+
+1. **Secret.** Create the secret the same way as the Signon one, with the id `<app>-entra-client-secret` (`infra/secrets.tf`):
+
+   ```bash
+   gcloud secrets create <app>-entra-client-secret --project "$PROJECT" --replication-policy=automatic
+   read -rs -p "Entra client secret: " ENTRA_CLIENT_SECRET; echo
+   printf '%s' "$ENTRA_CLIENT_SECRET" | gcloud secrets versions add <app>-entra-client-secret --project "$PROJECT" --data-file=-
+   unset ENTRA_CLIENT_SECRET
+   ```
+
+2. **Tenant and client id.** Neither is a secret. Enter the directory (tenant) id and the application (client) id for the environment in `entra_by_environment` in `infra/cloudrun_api.tf` (`{ tenant_id = "...", client_id = "..." }`) and merge. The app takes the authority `https://login.microsoftonline.com/<tenant>/v2.0` and refuses an ID token from another tenant.
+3. **Conditional Access.** Entra has no step-up in this app. Create a Conditional Access policy that requires multifactor authentication for this application. An administrator whose ID token has no `mfa` in `amr` gets no session and ends on the second-factor page, so without the policy no Entra administrator can sign in. Whether Entra always sends `amr` is not yet checked in a real tenant ([tech debt](../tech-debt/entra-amr-claim-not-verified-in-a-real-tenant.md)).
+4. **Never replace the registration.** The `sub` claim is different for every registration (pairwise), and the app keys an Entra person by it. A new registration gives every Entra person a new person id and so none of their data. Rotate the client secret instead.
+5. **First administrator.** Entra has no role the app reads. The first administrator is named in `Auth__BootstrapAdmins`, one string of `<provider>:<id>` entries separated by `,` or `;`: for Entra the person's **object id** (shown in the Entra admin centre under the user; the `sub` is only known after a sign-in), for BCC Signon the `personUid`. The ids belong to real people, so the value is not committed and not in Terraform: keep it in Secret Manager, created by hand like the client secrets:
+
+   ```bash
+   gcloud secrets create <app>-bootstrap-admins --project "$PROJECT" --replication-policy=automatic
+   read -rs -p "Bootstrap admins (entra:<object id>): " BOOTSTRAP_ADMINS; echo
+   printf '%s' "$BOOTSTRAP_ADMINS" | gcloud secrets versions add <app>-bootstrap-admins --project "$PROJECT" --data-file=-
+   unset BOOTSTRAP_ADMINS
+   ```
+
+   Then set `bootstrap_admins_secret_by_environment` for the environment to `true` in `infra/cloudrun_api.tf` and merge; Terraform reads the secret, grants the runtime account access to it and passes it to the service as `Auth__BootstrapAdmins`. A malformed entry stops the service at start (the message names the setting, never the value). Deploy, and have the person sign in: they get the admin role once. After that the list is not consulted for them again, so a revoke on the admin page sticks, and the setting can be turned off (and the secret deleted) once the first administrator has signed in. Further administrators are made on the admin page.
+
 **The collector's key** needs no step: Terraform writes it from the org secret, write-only.
 
 **Data Protection key.** The apply creates the key ring `<app>-<env>` and the key `data-protection` (90-day rotation) in Cloud KMS ([ADR 0021](../adrs/0021-data-protection-keys-in-postgres-with-kms.md)). The key has `prevent_destroy`: Terraform refuses to destroy it, because GCP never fully deletes key rings and keys and the stored Data Protection keys (and so every session) would be lost. A `destroy` of the environment fails on it until it is removed from state on purpose.
@@ -67,7 +109,7 @@ The gateway route (step 5) needs the backends, and the smoke test of **Deploy** 
 
 The apply creates Artifact Registry, the runtime service account, shared database access, the Data Protection key, the Pub/Sub topic and subscriptions, the Cloud Scheduler job, the Cloud Run service with the Cloud SQL Auth Proxy sidecar, the assets bucket and the gateway backends. The Artifact Registry cleanup policies start in dry run (`cleanup_policy_dry_run = true` in `infra/artifact_registry.tf`, standard 03.19): the first apply only reports what they would delete. After reading that report in the Cloud Logging audit log of the repository, set it to `false` in a follow-up change.
 
-The first **Deploy** (step 6) then pushes the image, applies the database schema (`db-apply`), uploads the assets and rolls out. Its smoke test expects an anonymous `GET /` to answer 302 to the identity provider and an anonymous `GET /api/me` to answer 401.
+The first **Deploy** (step 6) then pushes the image, applies the database schema (`db-apply`), uploads the assets and rolls out. Its smoke test expects an anonymous `GET /` to answer 302 to `LOGIN_REDIRECT` in `deploy.yml` (the provider's authorize URL, or `/auth/sign-in` when both providers are on; change it when you turn Entra on) and an anonymous `GET /api/me` to answer 401.
 
 Membership in the database admin group can take a few minutes to reach Cloud SQL. If the schema step fails to log in on the first run, re-run the workflow.
 

@@ -9,6 +9,7 @@ var testdata = builder.AddTestData(database, schema);
 var api = builder.AddApi(run, database, schema, testdata);
 var oidc = builder.AddOidcMock(run, api, database);
 api.WithOidcMock(oidc, run)
+    .WithEntraMock(oidc, run)
     .WithLocalMessaging();
 
 if (run.IsE2E)

@@ -28,9 +28,12 @@ locals {
   # sha256) and preview/api.tf on the same version.
   sql_proxy_image = "gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.26.2@sha256:e8c76356fb586300c63f0d29c8c75cfeeba33c29736f9d4afa2df2d78cd0fa19"
 
-  # BCC Signon (Auth0) per environment. The client id (not a secret) is kept here, not passed in as a variable. The
-  # placeholder fails the apply (precondition below) until the client exists and its id is entered
-  # (docs/runbooks/first-deploy.md). The client secret comes from Secret Manager.
+  # The sign-in providers per environment (ADR 0031): at least one must be on, and both may be. null turns a provider off: no
+  # setting, no secret and no secret access for it.
+  #
+  # BCC Signon (Auth0). The client id (not a secret) is kept here, not passed in as a variable. The placeholder fails the apply
+  # (precondition below) until the client exists and its id is entered (docs/runbooks/first-deploy.md). The client secret comes
+  # from Secret Manager (<app>-oidc-client-secret).
   oidc_client_placeholder = "SET-OIDC-CLIENT-ID"
   oidc_by_environment = {
     sandbox = { authority = "https://login.sandbox.bcc.no", client_id = "SET-OIDC-CLIENT-ID" }
@@ -38,13 +41,37 @@ locals {
   }
   oidc = local.oidc_by_environment[local.env]
 
+  # Microsoft Entra ID: the tenant and the client (application) id of the single-tenant app registration, neither a secret. Off
+  # by default. The client secret comes from Secret Manager (<app>-entra-client-secret). Steps: docs/runbooks/first-deploy.md.
+  #   sandbox = { tenant_id = "<directory (tenant) id>", client_id = "<application (client) id>" }
+  entra_by_environment = {
+    sandbox = null
+    prod    = null
+  }
+  entra = local.entra_by_environment[local.env]
+
+  signon_on = local.oidc != null
+  entra_on  = local.entra != null
+
+  # The first administrator (ADR 0031): Auth__BootstrapAdmins comes from the Secret Manager secret <app>-bootstrap-admins, because the
+  # ids are those of real people and are not committed (standard 18.15). Off by default. Turn it on once the secret exists
+  # (docs/runbooks/first-deploy.md); it may be turned off again after the first administrator has signed in.
+  bootstrap_admins_secret_by_environment = {
+    sandbox = false
+    prod    = false
+  }
+  bootstrap_admins_secret_on = local.bootstrap_admins_secret_by_environment[local.env]
+
   # No password: the proxy authenticates the runtime account (IAM database user = its email without
   # ".gserviceaccount.com", standard 03.14). The pool is kept small: with a shared server, each instance holds at most 10
   # connections.
-  api_env = {
-    Oidc__Authority = local.oidc.authority
-    Oidc__ClientId  = local.oidc.client_id
+  api_env = merge(
+    local.signon_on ? { Oidc__Authority = local.oidc.authority, Oidc__ClientId = local.oidc.client_id } : {},
+    local.entra_on ? { Entra__TenantId = local.entra.tenant_id, Entra__ClientId = local.entra.client_id } : {},
+    local.api_env_common,
+  )
 
+  api_env_common = {
     # deploy.yml bakes index.html into the API project's wwwroot, which the .NET SDK image puts under its working directory
     # /app. The host requires the path in Static mode (the default outside Development).
     Frontend__StaticPath = "/app/wwwroot"
@@ -81,6 +108,8 @@ resource "google_cloud_run_v2_service" "api" {
     google_project_service.services,
     google_project_iam_member.api_runtime,
     google_secret_manager_secret_iam_member.api_oidc_client_secret,
+    google_secret_manager_secret_iam_member.api_entra_client_secret,
+    google_secret_manager_secret_iam_member.api_bootstrap_admins,
     google_secret_manager_secret_iam_member.api_otel_exporter_otlp_headers,
     google_secret_manager_secret_version.otel_exporter_otlp_headers,
     google_pubsub_topic_iam_member.api_publisher,
@@ -129,13 +158,42 @@ resource "google_cloud_run_v2_service" "api" {
         }
       }
 
-      # Read at instance start from the latest version; rotating the secret needs a new revision.
-      env {
-        name = "Oidc__ClientSecret"
-        value_source {
-          secret_key_ref {
-            secret  = data.google_secret_manager_secret.oidc_client_secret.secret_id
-            version = "latest"
+      # Read at instance start from the latest version; rotating a secret needs a new revision. Only for a provider that is on.
+      dynamic "env" {
+        for_each = local.signon_on ? [1] : []
+        content {
+          name = "Oidc__ClientSecret"
+          value_source {
+            secret_key_ref {
+              secret  = data.google_secret_manager_secret.oidc_client_secret[0].secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
+
+      dynamic "env" {
+        for_each = local.entra_on ? [1] : []
+        content {
+          name = "Entra__ClientSecret"
+          value_source {
+            secret_key_ref {
+              secret  = data.google_secret_manager_secret.entra_client_secret[0].secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
+
+      dynamic "env" {
+        for_each = local.bootstrap_admins_secret_on ? [1] : []
+        content {
+          name = "Auth__BootstrapAdmins"
+          value_source {
+            secret_key_ref {
+              secret  = data.google_secret_manager_secret.bootstrap_admins[0].secret_id
+              version = "latest"
+            }
           }
         }
       }
@@ -204,7 +262,12 @@ resource "google_cloud_run_v2_service" "api" {
     ignore_changes = [template[0].containers[0].image, client, client_version, labels]
 
     precondition {
-      condition     = local.oidc.client_id != local.oidc_client_placeholder
+      condition     = local.signon_on || local.entra_on
+      error_message = "Turn on at least one sign-in provider for ${local.env}: oidc_by_environment (BCC Signon) or entra_by_environment (Entra ID) in infra/cloudrun_api.tf."
+    }
+
+    precondition {
+      condition     = local.signon_on ? local.oidc.client_id != local.oidc_client_placeholder : true
       error_message = "Set the BCC Signon client id for ${local.env} in oidc_by_environment (infra/cloudrun_api.tf); see docs/runbooks/first-deploy.md."
     }
 

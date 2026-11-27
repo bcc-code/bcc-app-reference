@@ -1,4 +1,5 @@
 using BccCode.Template.Notes;
+using BccCode.Template.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Npgsql;
@@ -22,6 +23,11 @@ public sealed class TemplateDb(DbContextOptions<TemplateDb> options, TemplateDbS
     public string? Schema { get; } = schema.Name;
 
     public DbSet<Note> Notes => Set<Note>();
+
+    // Who has signed in with which provider, and the roles stored for them (ADR 0031).
+    public DbSet<PersonIdentity> PersonIdentities => Set<PersonIdentity>();
+
+    public DbSet<RoleGrant> RoleGrants => Set<RoleGrant>();
 
     // The host's sign-in sessions and the Data Protection key ring.
     public DbSet<AuthSessionRow> AuthSessions => Set<AuthSessionRow>();

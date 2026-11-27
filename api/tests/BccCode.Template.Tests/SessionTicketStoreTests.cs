@@ -17,12 +17,12 @@ public class SessionTicketStoreTests
 
     private static AuthenticationTicket Ticket(string person = "a0000000-0000-4000-8000-000000000001", string sid = "sid-1", DateTimeOffset? expires = null, string subject = "subject-1")
     {
-        return new(
-            SessionClaims.FromIdToken(
-                new ClaimsPrincipal(new ClaimsIdentity([new Claim(AuthClaims.Subject, subject), new Claim(AuthClaims.PersonUid, person), new Claim("name", "Una User"), new Claim("sid", sid), new Claim("email", "dropped@example.test")], "oidc")),
-                "https://idp.example")!,
-            new AuthenticationProperties { ExpiresUtc = expires },
-            "Cookies");
+        // Built the way the sign-in builds it: the slim claims of the ID token, then the person id the app issued.
+        var principal = SessionClaims.FromIdToken(
+            new ClaimsPrincipal(new ClaimsIdentity([new Claim(AuthClaims.Subject, subject), new Claim(AuthClaims.SignonPersonUid, person), new Claim("name", "Una User"), new Claim("sid", sid), new Claim("email", "dropped@example.test")], "oidc")),
+            "https://idp.example", AuthProviders.BccSignon)!;
+        SessionClaims.AddPerson(principal, Guid.Parse(person), []);
+        return new(principal, new AuthenticationProperties { ExpiresUtc = expires }, "Cookies");
     }
 
     [Fact]
@@ -32,7 +32,7 @@ public class SessionTicketStoreTests
 
         var ticket = await _store.RetrieveAsync(key);
 
-        ticket!.Principal.FindFirst(AuthClaims.PersonUid)!.Value.Should().Be("a0000000-0000-4000-8000-000000000001");
+        ticket!.Principal.FindFirst(AuthClaims.PersonId)!.Value.Should().Be("a0000000-0000-4000-8000-000000000001");
         ticket.Principal.FindFirst("name")!.Value.Should().Be("Una User");
     }
 
@@ -51,7 +51,7 @@ public class SessionTicketStoreTests
     {
         var ticket = await _store.RetrieveAsync(await _store.StoreAsync(Ticket()));
 
-        ticket!.Principal.Claims.Select(c => c.Type).Should().BeEquivalentTo(AuthClaims.Subject, AuthClaims.PersonUid, "name", "sid", "iss");
+        ticket!.Principal.Claims.Select(c => c.Type).Should().BeEquivalentTo(AuthClaims.Subject, AuthClaims.PersonId, AuthClaims.Provider, "name", "sid", "iss");
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class SessionTicketStoreTests
 
         await _store.RenewAsync(key, Ticket(person: "a0000000-0000-4000-8000-000000000002"));
 
-        (await _store.RetrieveAsync(key))!.Principal.FindFirst(AuthClaims.PersonUid)!.Value.Should().Be("a0000000-0000-4000-8000-000000000002");
+        (await _store.RetrieveAsync(key))!.Principal.FindFirst(AuthClaims.PersonId)!.Value.Should().Be("a0000000-0000-4000-8000-000000000002");
     }
 
     private sealed class InMemorySessions : IAuthSessionStorage

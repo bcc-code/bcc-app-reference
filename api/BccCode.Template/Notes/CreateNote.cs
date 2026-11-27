@@ -21,7 +21,7 @@ public static class CreateNoteEndpoint
     public static (Created<CreateNoteResponse>, IStorageAction<Note>) Post(CreateNoteRequest request, CallerAccess access, TimeProvider time)
     {
         var now = time.GetUtcNow();
-        var note = Note.Create(Guid.CreateVersion7(now), now, access.PersonUid, NoteContent.Parse(request.Title, request.Body));
+        var note = Note.Create(Guid.CreateVersion7(now), now, access.PersonId, NoteContent.Parse(request.Title, request.Body));
         var response = new CreateNoteResponse(note.Id, note.Title, note.Body, note.CreatedAt, note.UpdatedAt, note.Version);
         return (TypedResults.Created($"/api/notes/{note.Id}", response), Storage.Insert(note));
     }

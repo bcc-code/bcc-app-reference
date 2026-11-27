@@ -42,7 +42,7 @@ public sealed class TracingTests(AppFixture fixture) : AppTest(fixture)
         var spans = await _spans.TraceAsync(trace);
         var request = spans.Should().ContainSingle(s => s.Kind == ActivityKind.Server).Subject;
         request.ParentSpanId.Should().Be(upstream);
-        request.GetTagItem(SessionTelemetry.SessionIdKey).Should().Be(TestUser.SidOf(user.PersonUid.ToString()));
+        request.GetTagItem(SessionTelemetry.SessionIdKey).Should().Be(TestUser.SidOf(user.PersonId.ToString()));
         spans.Should().Contain(s => s.GetTagItem("db.system.name") as string == "postgresql", "the Npgsql spans come from the data source");
     }
 

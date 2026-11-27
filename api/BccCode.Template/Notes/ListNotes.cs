@@ -14,7 +14,7 @@ public static class ListNotesEndpoint
 {
     public static async Task<IReadOnlyList<Note>> LoadAsync(CallerAccess access, TemplateDb db, CancellationToken cancellationToken)
     {
-        return await db.Notes.AsNoTracking().Where(n => n.OwnerId == access.PersonUid).OrderByDescending(n => n.CreatedAt).ToListAsync(cancellationToken);
+        return await db.Notes.AsNoTracking().Where(n => n.OwnerId == access.PersonId).OrderByDescending(n => n.CreatedAt).ToListAsync(cancellationToken);
     }
 
     [WolverineGet("/api/notes")]

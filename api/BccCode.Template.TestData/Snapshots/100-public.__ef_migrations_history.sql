@@ -2,4 +2,5 @@
 \connect "template"
 COPY public.__ef_migrations_history (migration_id, product_version) FROM stdin;
 20261113145640_Initial	10.0.15
+20261127094050_AddPersonIdentitiesAndRoleGrants	10.0.15
 \.

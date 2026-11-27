@@ -1,15 +1,50 @@
 # The OIDC client secret of BCC Signon. The value is never in Terraform state or GitHub: a person creates the secret and
 # its first version with gcloud before the first deploy (docs/runbooks/first-deploy.md):
 #   printf '%s' "<value>" | gcloud secrets create bcc-template-oidc-client-secret --data-file=- --project <project>
-# Terraform only reads the secret and grants access to it. The apply fails until the secret exists.
+# Terraform only reads the secret and grants access to it. The apply fails until the secret exists. Only where BCC Signon is on.
 data "google_secret_manager_secret" "oidc_client_secret" {
+  count      = local.signon_on ? 1 : 0
   depends_on = [google_project_service.services] # the API must be on before first use
   secret_id  = "${local.app}-oidc-client-secret"
 }
 
 # On this secret only, not project-wide (standard 04.10).
 resource "google_secret_manager_secret_iam_member" "api_oidc_client_secret" {
-  secret_id = data.google_secret_manager_secret.oidc_client_secret.id
+  count     = local.signon_on ? 1 : 0
+  secret_id = data.google_secret_manager_secret.oidc_client_secret[0].id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.api.email}"
+}
+
+# The client secret of the Entra app registration, created by hand the same way (ADR 0031):
+#   printf '%s' "<value>" | gcloud secrets create bcc-template-entra-client-secret --data-file=- --project <project>
+# Only where Entra is on.
+data "google_secret_manager_secret" "entra_client_secret" {
+  count      = local.entra_on ? 1 : 0
+  depends_on = [google_project_service.services]
+  secret_id  = "${local.app}-entra-client-secret"
+}
+
+resource "google_secret_manager_secret_iam_member" "api_entra_client_secret" {
+  count     = local.entra_on ? 1 : 0
+  secret_id = data.google_secret_manager_secret.entra_client_secret[0].id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.api.email}"
+}
+
+# The first administrators (ADR 0031): one string of <provider>:<id> entries, for example
+# "entra:<object id>,bcc-signon:<personUid>". The ids belong to real people, so the value is not in the repository or in Terraform state.
+# Created by hand like the client secrets; only where bootstrap_admins_secret_by_environment turns it on:
+#   printf '%s' "entra:<object id>" | gcloud secrets create bcc-template-bootstrap-admins --data-file=- --project <project>
+data "google_secret_manager_secret" "bootstrap_admins" {
+  count      = local.bootstrap_admins_secret_on ? 1 : 0
+  depends_on = [google_project_service.services]
+  secret_id  = "${local.app}-bootstrap-admins"
+}
+
+resource "google_secret_manager_secret_iam_member" "api_bootstrap_admins" {
+  count     = local.bootstrap_admins_secret_on ? 1 : 0
+  secret_id = data.google_secret_manager_secret.bootstrap_admins[0].id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.api.email}"
 }

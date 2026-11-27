@@ -21,7 +21,8 @@ code (`git log -- api/BccCode.Template/Changes/`).
 ## Standards this leaves open
 
 - **18.13** Changes to personal data and admin actions must record the actor and time. Nothing records them now. A note's
-  `updated_at` and `archived_at` hold a time but not who.
+  `updated_at` and `archived_at` hold a time but not who. An admin grant (`role_grants`, ADR 0031) records who granted and who
+  revoked it, but only the latest of each: granting the role again overwrites the revoke's time and actor.
 - **18.14** The audit trail should be append-only and stored apart from tables the app updates. There is no audit trail.
 - **18.6 and 18.7** (retention and erasure) were already open ([data inventory](../data-protection/data-inventory.md#anonymization-and-erasure)).
   Whatever replaces the history must be reachable by the erasure procedure.
