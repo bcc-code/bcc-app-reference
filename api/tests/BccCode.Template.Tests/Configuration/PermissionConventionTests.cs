@@ -17,6 +17,7 @@ public sealed class PermissionConventionTests
         ["ListNotesEndpoint"] = "Lists only the caller's own notes.",
         ["CreateNoteEndpoint"] = "Anyone signed in adds a note of their own.",
         ["GetStatsEndpoint"] = "Under /api/admin: the admin policy applies by route prefix, and the counts are the same for every administrator.",
+        ["ListPeopleEndpoint"] = "Under /api/admin: the admin policy applies by route prefix, and every administrator sees the same list. Names only, no email.",
     };
 
     private static List<Type> EndpointClasses()

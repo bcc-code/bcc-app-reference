@@ -13,4 +13,8 @@
     <PackageReference Include="Aspire.Hosting.PostgreSQL" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.PostgreSQL.Extensions" />
   </ItemGroup>
+  <!-- The personas' Entra ids (the bootstrap administrators): one file, shared with the mock, the seeder and the tests. -->
+  <ItemGroup>
+    <Compile Include="..\OidcMock\Personas.cs" Link="Personas.cs" />
+  </ItemGroup>
 </Project>

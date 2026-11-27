@@ -75,7 +75,7 @@ terraform -chdir=infra providers lock -platform=linux_amd64 -platform=linux_arm6
 
 What differs between `sandbox` and `prod` is in `locals` maps keyed by environment, so a reviewer sees it in one place:
 
-- `api_scaling_by_environment`, `api_ingress_by_environment` and `oidc_by_environment` in `cloudrun_api.tf`;
+- `api_scaling_by_environment`, `api_ingress_by_environment`, `oidc_by_environment` (BCC Signon) and `entra_by_environment` (Entra ID, `null` = off) and `bootstrap_admins_secret_by_environment` (the secret `<app>-bootstrap-admins` with the first administrators) in `cloudrun_api.tf`;
 - `public_hostname_by_environment` in `monitoring.tf` (the gateway host name, for the uptime check).
 
 The OIDC client ids are placeholders (`SET-OIDC-CLIENT-ID`) and a precondition fails the apply until a real id is entered. Prod
@@ -96,7 +96,7 @@ must use `INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER` and at least one `alert_emails
   `PROPS`.
 - The database schema. `deploy.yml` applies it with the image's schema command before the rollout.
 
-The OIDC client secret `<app>-oidc-client-secret` is created by hand with its first version
+The OIDC client secret `<app>-oidc-client-secret` (and `<app>-entra-client-secret` where Entra is on) is created by hand with its first version
 ([first-deploy runbook](../docs/runbooks/first-deploy.md)); Terraform only reads it, so no secret value passes through state. The
 monitoring collector's key is the exception: nobody on the team can read the org secret, so Terraform writes
 `<app>-otel-exporter-otlp-headers` itself, write-only, and a rotated key gets a new version on the next apply. The database
@@ -106,7 +106,7 @@ uses IAM authentication, so it has no password.
 
 1. Run `provision-project.yml` for the environment (once per environment). It must run with `use-shared-db: true` before the
    first apply: `cloudrun_api.tf` and `database.tf` read `shared_db` from `PROPS`.
-2. Create the OIDC client secret and enter the client id in `oidc_by_environment`.
+2. Create the client secret of each provider that is on and enter its client id in `oidc_by_environment` (and the tenant and client id in `entra_by_environment`).
 3. Apply this Terraform (`infra.yml`, or the first `deploy.yml` run). This creates the backends the gateway refers to. The first
    apply of `gateway_backend_assets` can fail on the object-access grant because the load balancer's service agent is created
    with the project's first backend bucket; apply again.

@@ -9,7 +9,7 @@ namespace BccCode.Template.Api.Auth;
 /// </summary>
 public static class AdminMfaMiddleware
 {
-    public const string AdminRoleKey = "Auth:AdminRole";
+    public const string AdminRoleKey = AuthSettings.AdminRoleKey;
 
     public static readonly string ProblemType = Problems.TypeOf(Problems.Keys.MfaRequired);
 

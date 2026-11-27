@@ -4,6 +4,7 @@
 - Date: 2026-11-13
 - Drafted with AI assistance; a person must review it before it is accepted.
 - Adapted from bcc-ateam ADR 0021. Differs on PAR, see below.
+- Microsoft Entra ID can be turned on next to BCC Signon, and the person id is then the app's own claim: see [ADR 0031](0031-entra-id-sign-in-next-to-bcc-signon.md).
 
 ## Context
 

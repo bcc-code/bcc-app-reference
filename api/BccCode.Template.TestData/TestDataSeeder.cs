@@ -1,4 +1,5 @@
 using BccCode.Template.Persistence;
+using BccCode.Template.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
@@ -20,15 +21,17 @@ public sealed class TestDataSeeder(IDbContextFactory<TemplateDb> dbs, IHostEnvir
     }
 
     /// <summary>
-    /// Deletes the data of every table, then seeds again. The sign-in sessions stay, so nobody is signed out, and so does the Data
-    /// Protection key ring: a running API holds it in memory and does not write the keys again.
+    /// Deletes the data of every table, then seeds again. The sign-in sessions stay, so nobody is signed out, and so do the identities
+    /// and role grants they belong to (ADR 0031): they are sign-in state, not seed data, and a session that outlived its identity row
+    /// would give an Entra person a new person id (and so none of their notes) at the next sign-in. The Data Protection key ring stays
+    /// too: a running API holds it in memory and does not write the keys again.
     /// </summary>
     public async Task ResetAsync(CancellationToken cancellationToken)
     {
         SeedingGate.EnsureAllowed(environment);
         await using (var db = await dbs.CreateDbContextAsync(cancellationToken))
         {
-            await db.DeleteAllDataAsync([typeof(AuthSessionRow), typeof(DataProtectionKeyRow)], cancellationToken);
+            await db.DeleteAllDataAsync([typeof(AuthSessionRow), typeof(DataProtectionKeyRow), typeof(PersonIdentity), typeof(RoleGrant)], cancellationToken);
         }
 
         log.Reset();

@@ -210,9 +210,10 @@ jobs:
       # The gateway URL (https://<app>.sandbox.bcc.no). Required: ingress is the internal load balancer from the start, so
       # the run.app URL answers 404 to the runner and the smoke test fails when this is empty.
       APP_BASE_URL: ${{ vars.APP_BASE_URL }}
-      # Keep equal to Oidc__Authority in infra/cloudrun_api.tf (oidc_by_environment). The smoke test expects the login
-      # redirect to point there.
-      OIDC_AUTHORITY: https://login.sandbox.bcc.no
+      # Where an anonymous request for the shell must redirect, matched in the Location header (ADR 0031). Keep it
+      # in step with the providers in infra/cloudrun_api.tf: BCC Signon only, the Oidc__Authority + /authorize; Entra ID only,
+      # https://login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize; both, /auth/sign-in.
+      LOGIN_REDIRECT: https://login.sandbox.bcc.no/authorize
     steps:
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
@@ -336,12 +337,13 @@ jobs:
           curl "${curl_opts[@]}" "$url/health"
           echo
           # Everything but /health and /alive requires a session. Anonymous navigation to the shell is redirected to the
-          # identity provider (curl does not follow redirects), and the redirect carries the security headers.
+          # identity provider, or to the sign-in page when two providers are on (LOGIN_REDIRECT; curl does not follow redirects), and the
+          # redirect carries the security headers.
           # --fail is left out here because the expected status is not 2xx.
           status=$(curl --silent --show-error --max-time 30 --retry 3 --retry-delay 5 --retry-all-errors \
             --output /dev/null --dump-header headers.txt --write-out '%{http_code}' "$url/")
           test "$status" = 302
-          tr -d '\r' < headers.txt | grep -iE "^location: $OIDC_AUTHORITY/authorize"
+          tr -d '\r' < headers.txt | grep -iF "location: $LOGIN_REDIRECT"
           grep -iE '^strict-transport-security: max-age=31536000' headers.txt
           grep -iE '^x-content-type-options: nosniff' headers.txt
           # An API call without a session is 401, never a redirect.
@@ -375,8 +377,8 @@ jobs:
       # The gateway URL of prod. Required: ingress is internal, so the run.app URL is not reachable from the runner. Set it
       # in the prod environment before the first prod deploy.
       APP_BASE_URL: ${{ vars.APP_BASE_URL }}
-      # Keep equal to Oidc__Authority in infra/cloudrun_api.tf (oidc_by_environment).
-      OIDC_AUTHORITY: https://login.bcc.no
+      # Where an anonymous request for the shell must redirect; the same rule as LOGIN_REDIRECT in the sandbox job.
+      LOGIN_REDIRECT: https://login.bcc.no/authorize
     steps:
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
@@ -505,12 +507,13 @@ jobs:
           curl "${curl_opts[@]}" "$url/health"
           echo
           # Everything but /health and /alive requires a session. Anonymous navigation to the shell is redirected to the
-          # identity provider (curl does not follow redirects), and the redirect carries the security headers.
+          # identity provider, or to the sign-in page when two providers are on (LOGIN_REDIRECT; curl does not follow redirects), and the
+          # redirect carries the security headers.
           # --fail is left out here because the expected status is not 2xx.
           status=$(curl --silent --show-error --max-time 30 --retry 3 --retry-delay 5 --retry-all-errors \
             --output /dev/null --dump-header headers.txt --write-out '%{http_code}' "$url/")
           test "$status" = 302
-          tr -d '\r' < headers.txt | grep -iE "^location: $OIDC_AUTHORITY/authorize"
+          tr -d '\r' < headers.txt | grep -iF "location: $LOGIN_REDIRECT"
           grep -iE '^strict-transport-security: max-age=31536000' headers.txt
           grep -iE '^x-content-type-options: nosniff' headers.txt
           # An API call without a session is 401, never a redirect.

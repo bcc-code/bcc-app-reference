@@ -34,6 +34,30 @@
       "title": "Statistics",
       "activeNotes": "Active notes",
       "archivedNotes": "Archived notes"
+    },
+    "people": {
+      "title": "Administrators",
+      "search": "Search by name",
+      "searchButton": "Search",
+      "empty": "No one has signed in yet, or no one matches.",
+      "unnamed": "(no name)",
+      "columns": {
+        "name": "Name",
+        "provider": "Signed in with",
+        "lastSignIn": "Last sign-in",
+        "admin": "Administrator",
+        "actions": "Actions"
+      },
+      "provider": {
+        "bccSignon": "BCC Signon",
+        "entra": "Microsoft Entra",
+        "other": "Other"
+      },
+      "yes": "Yes",
+      "no": "No",
+      "grantFor": "Make {name} an administrator",
+      "revokeFor": "Remove {name} as administrator",
+      "grantNote": "A new administrator gets the role the next time they sign in. Removing the role signs the person out at once."
     }
   },
   "noAccess": {
@@ -60,6 +84,9 @@
       "titleRequired": "Enter a title.",
       "titleTooLong": "The title can be at most 200 characters.",
       "bodyTooLong": "The text can be at most 10 000 characters."
+    },
+    "admin": {
+      "cannotRevokeSelf": "You cannot remove yourself as administrator."
     }
   },
   "layout": {

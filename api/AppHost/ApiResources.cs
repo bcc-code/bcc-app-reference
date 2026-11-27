@@ -1,6 +1,7 @@
 using Aspire.Hosting.Dotnet;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using OidcMock;
 
 /// <summary>The API and what it is connected to locally: sign-in, messaging and the frontend.</summary>
 internal static class ApiResources
@@ -40,6 +41,23 @@ internal static class ApiResources
         return api.WithEnvironment("Oidc__Authority", oidc.GetEndpoint(run.IsE2E ? "http" : "https"))
             .WithEnvironment("Oidc__ClientId", OidcMockResources.ClientId)
             .WaitFor(oidc);
+    }
+
+    /// <summary>
+    /// Turns the Entra sign-in on next to Signon, against the mock's <c>template-entra</c> client (ADR 0031). The mock is the Entra
+    /// authority (the API accepts that override in Development and Test only), and the two administrator personas are bootstrapped by
+    /// their object id, so the first administrator needs no manual grant. Previews do not call this: they stay Signon only.
+    /// </summary>
+    public static IResourceBuilder<DotnetProjectResource> WithEntraMock(this IResourceBuilder<DotnetProjectResource> api,
+        IResourceBuilder<DotnetProjectResource> oidc, RunMode run)
+    {
+        api.WithEnvironment("Entra__TenantId", Persona.EntraTenantId)
+            .WithEnvironment("Entra__ClientId", Persona.EntraClientId)
+            .WithEnvironment("Entra__Authority", oidc.GetEndpoint(run.IsE2E ? "http" : "https"));
+        // One setting, as in Secret Manager: <provider>:<id> entries separated by commas.
+        api.WithEnvironment("Auth__BootstrapAdmins", string.Join(',', new[] { Persona.Admin, Persona.AdminNoMfa }.Select(p => $"entra:{p.EntraObjectId}")));
+
+        return api;
     }
 
     /// <summary>

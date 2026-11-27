@@ -1,5 +1,7 @@
+using BccCode.Template.Api.Auth;
 using BccCode.Template.IntegrationTests.Infrastructure;
 using BccCode.Template.Notes;
+using BccCode.Template.Security;
 using BccCode.Template.TestData;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -48,12 +50,15 @@ public class SeederTests(AppFixture fixture) : AppTest(fixture)
 
         var stranger = TestUser.New();
         await Host.Scenario(s => { s.As(stranger); s.Post.Json(new CreateNoteRequest("Mine", "")).ToUrl("/api/notes"); s.StatusCodeShouldBe(201); });
+        await Host.Services.GetRequiredService<SignInPeople>().RecordAsync(
+            new SignInRequest(AuthProviders.Entra, TestEntra.Issuer, "reset-sub", "Reset Person", null, null), Ct);
         await seeder.ResetAsync(Ct);
 
         await using var after = Fixture.NewDb();
-        (await after.Notes.CountAsync(n => n.OwnerId == stranger.PersonUid, Ct)).Should().Be(0);
+        (await after.Notes.CountAsync(n => n.OwnerId == stranger.PersonId, Ct)).Should().Be(0);
         (await after.Notes.CountAsync(n => n.OwnerId == owner, Ct)).Should().Be(2, "the seed is applied again");
         (await after.AuthSessions.CountAsync(Ct)).Should().BeGreaterThan(0, "a reset does not sign anybody out");
+        (await after.PersonIdentities.CountAsync(i => i.Subject == "reset-sub", Ct)).Should().Be(1, "the identity of a session that stays must stay too");
         await app.StopAsync(Ct);
     }
 

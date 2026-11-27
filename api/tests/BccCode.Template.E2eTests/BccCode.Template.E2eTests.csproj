@@ -25,9 +25,6 @@
     <ProjectReference Include="..\..\BccCode.Template.TestData\BccCode.Template.TestData.csproj" IsAspireProjectResource="false" ReferenceOutputAssembly="false" />
     <ProjectReference Include="..\..\OidcMock\OidcMock.csproj" IsAspireProjectResource="false" ReferenceOutputAssembly="false" />
   </ItemGroup>
-  <!-- The personas are compiled in from the mock instead of referencing it: its OpenIddict packages would pull vulnerable
-       transitive versions into a project that is not an ASP.NET Core app. -->
-  <ItemGroup>
-    <Compile Include="..\..\OidcMock\Personas.cs" Link="Infrastructure\Personas.cs" />
-  </ItemGroup>
+  <!-- The personas are not compiled in here: the AppHost compiles them in from the mock (its OpenIddict packages would pull vulnerable
+       transitive versions into a project that is not an ASP.NET Core app), and this project reaches them through its reference. -->
 </Project>

@@ -8,10 +8,10 @@ The legal basis, the roles (controller, processor) and the information given to 
 
 ## Identifiers
 
-- **personUid** is BCC's person id from BCC Signon (the claim `https://login.bcc.no/claims/personUid`). It is pseudonymous: it does not name a person without BCC's person registry. All data is keyed by it ([ADR 0019](../adrs/0019-bff-sign-in-with-bcc-signon.md)). It is stored in the stores below and is never logged (standard 18.9).
+- **Person id** (`template:person`) keys all data ([ADR 0031](../adrs/0031-entra-id-sign-in-next-to-bcc-signon.md)). For a BCC Signon sign-in it is BCC's person id (the claim `https://login.bcc.no/claims/personUid`), which is pseudonymous: it does not name a person without BCC's person registry ([ADR 0019](../adrs/0019-bff-sign-in-with-bcc-signon.md)). For a Microsoft Entra sign-in it is a random Guid the app issues the first time the Entra subject signs in. The two are never linked, so one human who uses both providers has two person ids. It is stored in the stores below and is never logged (standard 18.9). The caller's own id is never returned to the caller's browser; administrators see other people's ids on the admin people API, and those ids are in the admin route paths and so in traces (store 5). In this document "personUid" in a field list means this person id.
 - **Note id** is a random Guid with no personal data in it.
 
-The OIDC `sub` claim is kept only in the session store (section 2), for back-channel logout. It is not copied into notes.
+The OIDC `sub` claim is kept in the session store (section 2) and in the identity table (section 7), to find a person's sessions. It is not copied into notes.
 
 ## Stores
 
@@ -37,7 +37,7 @@ The template keeps no email address, phone number or address: the API requests t
 - **Purpose:** keeping the user signed in (BFF cookie session), and ending sessions on back-channel logout.
 - **Who can read it:** only the app; the ticket is encrypted with keys protected by Cloud KMS.
 - **Retention:** 8 hours, sliding.
-- **Deletion:** on logout, on back-channel logout from BCC Signon, and expired rows when a new session is stored. Expired rows are not read. An expired row stays until someone signs in again.
+- **Deletion:** on logout, on back-channel logout from BCC Signon, when an administrator revokes the admin role of the person (their sessions end at once, `DELETE /api/admin/people/{personId}/admin`), and expired rows when a new session is stored. Expired rows are not read. An expired row stays until someone signs in again.
 
 ### 3. Data Protection keys (key table)
 
@@ -55,7 +55,7 @@ The template keeps no email address, phone number or address: the API requests t
 ### 5. Logs and traces
 
 - **Where:** logs in Cloud Logging in our project (stdout JSON). Traces and metrics go over OTLP to the BCC monitoring collector ([ADR 0026](../adrs/0026-telemetry-export-through-the-bcc-monitoring-collector.md)), which writes the traces to Cloud Trace in our project and in the platform's central monitoring project, and the metrics to Managed Prometheus in the central project. Locally, everything goes to the Aspire dashboard.
-- **Fields:** logs carry the route template, method, status, trace id and internal request id, and no personal identifier: not the personUid, `sub`, the display name, note titles or bodies, or URLs with query strings (standard 18, rules 9 and 12). No identifier is logged on purpose, so there are no exceptions to list. Traces hold request paths with note ids, SQL text without parameter values, and Wolverine message types and ids. The request span of a signed-in user holds the BCC Signon session id (`sid`) as `session.id`, which Signon can link to the person; it is also sent as baggage to `*.bcc.no` hosts only. Metrics hold no personal identifiers.
+- **Fields:** logs carry the route template, method, status, trace id and internal request id, and no personal identifier: not the personUid, `sub`, the display name, note titles or bodies, or URLs with query strings (standard 18, rules 9 and 12). No identifier is logged on purpose, so there are no exceptions to list. Traces hold request paths with note ids, SQL text without parameter values, and Wolverine message types and ids. The request span of a signed-in user holds the identity provider's session id (`sid`, from BCC Signon or from Entra) as `session.id`, which the provider can link to the person; it is also sent as baggage to `*.bcc.no` hosts only. The admin routes carry a person id in the path (`/api/admin/people/{personId}/admin`), so the request paths in traces hold the person ids of the people an administrator grants or revokes; the id is pseudonymous (see Identifiers). Nothing logs it. Metrics hold no personal identifiers.
 - **The OTLP header secret:** the collector's key (`Authorization=AuthKey <key>`) is in Secret Manager as `<app>-otel-exporter-otlp-headers`, written by Terraform write-only, so it is not in state. It is not personal data, and it is never logged or copied into tickets.
 - **Retention:** logs: set by the platform's Cloud Logging buckets, not by this repository (open question 5). Traces: 30 days, Cloud Trace's fixed retention, in both projects. Metrics: set by bcc-monitoring.
 - **Who can read it:** our project's members; for traces and metrics also whoever has access to the central monitoring project (open question 5).
@@ -65,9 +65,22 @@ The template keeps no email address, phone number or address: the API requests t
 
 - The browser holds the session cookie and what the page shows. The SPA keeps no personal data in local storage. No token reaches the browser.
 
-### 7. Local development, previews and tests only
+### 7. Identities and role grants (`person_identities`, `role_grants`)
 
-- The seeder (`api/BccCode.Template.TestData`) and the OIDC mock use generated personas only (`user`, `user2`, `admin`, with made-up personUids). The seeder refuses to run outside Development, Test, Sandbox and Preview (`SeedingGate`), and runs once (`Seeder:Once`). Previews hold generated test data only and are public in practice ([pr-previews](../pr-previews.md)). Integration tests use Testcontainers Postgres that goes away with the container. Never use production data here (standard 18, rule 15).
+- **Code:** `api/BccCode.Template/Security/` (the tables), `api/BccCode.Template.Api/Auth/SignInPeople.cs` (written at sign-in) and `api/BccCode.Template/Admin/` (the admin page's list, grant and revoke), [ADR 0031](../adrs/0031-entra-id-sign-in-next-to-bcc-signon.md).
+- **Where:** two tables in the environment's Postgres database.
+- **Fields:**
+  - `person_identities`: provider (`bcc-signon` or `entra`), the provider's `sub` (for Entra a pairwise, per-registration value that names no one outside the tenant), issuer, person id, display name (the `name` claim of the last sign-in, at most 200 characters), first and last sign-in time, and `version`. No email address is requested or stored.
+  - `role_grants`: person id, role (the value of `Auth:AdminRole`), granted and revoked time, who granted and who revoked (an administrator's person id; empty for a grant made by the `Auth:BootstrapAdmins` configuration), and `version`.
+  - The `Auth:BootstrapAdmins` setting names the first administrators by their Entra object id or Signon `personUid`, which are ids of real people. It is not committed: it lives in the Secret Manager secret `<app>-bootstrap-admins` (readable by the runtime account only, created by hand, not in Terraform state) and can be removed once the first administrator has signed in.
+- **Purpose:** to give an Entra person a stable person id, to let an administrator find the people who have signed in and give or take the admin role, and to end a person's sessions at once on a revoke.
+- **Who can read it:** administrators, through `GET /api/admin/people` (person id, name, provider, last sign-in and whether the person is an administrator; no `sub`, no issuer). The person ids of other people reach administrators this way, and appear in the admin route paths. Database access is for the admin group of the shared database. The display name is personal data in clear text.
+- **Retention:** not decided (open questions 2 and 4). A revoked grant is kept on purpose, so that a revoke is not undone by the bootstrap list. Nothing deletes an identity row today.
+- **Deletion:** by an erasure procedure that an application adds; the template has none (open question 4). Deleting an Entra identity row loses the person id for good, and the data keyed by it is no longer reachable.
+
+### 8. Local development, previews and tests only
+
+- The seeder (`api/BccCode.Template.TestData`) and the OIDC mock use generated personas only (`user`, `user2`, `admin`, `admin-no-mfa`, with made-up person uids and, for the Entra client, made-up subjects and object ids). The seeder refuses to run outside Development, Test, Sandbox and Preview (`SeedingGate`), and runs once (`Seeder:Once`). Previews hold generated test data only and are public in practice ([pr-previews](../pr-previews.md)). Integration tests use Testcontainers Postgres that goes away with the container. Never use production data here (standard 18, rule 15).
 
 ## Anonymization and erasure
 
@@ -83,9 +96,9 @@ The design erases rather than anonymizes: a note that has reached the end of its
 
 For the privacy team.
 
-1. **Legal basis and roles** for processing note content and the owner's personUid, and what users are told.
+1. **Legal basis and roles** for processing note content, the owner's person id, and the names and sign-in times in the identity table, and what users are told.
 2. **Retention** for active and archived notes, and whether archiving should lead to deletion after a period.
 3. **Special categories.** Whether a notice about not storing special-category data in notes is enough, or the feature needs further limits.
 4. **Erasure on request.** Who triggers erasure for one person's notes (an admin action, a self-service request or an operator task), and how a request is verified.
-5. **Logs and traces.** The retention of the platform's Cloud Logging buckets and of the metrics in bcc-monitoring, and who can read traces in the central monitoring project, where they hold the Signon `sid` of signed-in users.
+5. **Logs and traces.** The retention of the platform's Cloud Logging buckets and of the metrics in bcc-monitoring, and who can read traces in the central monitoring project, where they hold the `sid` of signed-in users (BCC Signon or Entra) and, on the admin routes, person ids.
 6. **Backups.** Cloud SQL backup retention and its relation to deletion requests.

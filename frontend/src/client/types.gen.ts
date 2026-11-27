@@ -78,6 +78,10 @@ export type ListNotesResponse = {
   notes: Array<NoteItem>
 }
 
+export type ListPeopleResponse = {
+  people: Array<PersonItem>
+}
+
 export type NoteItem = {
   id: string
   title: string
@@ -87,6 +91,29 @@ export type NoteItem = {
   version: number
 }
 
+export type PersonItem = {
+  /**
+   * The app's person id, which the grant and revoke routes take.
+   */
+  personId: string
+  /**
+   * The name from the last sign-in; empty when the token had none.
+   */
+  displayName: string
+  /**
+   * The provider key of this identity (`bcc-signon` or `entra`).
+   */
+  provider: string
+  /**
+   * When this identity last signed in.
+   */
+  lastSignInAt: string
+  /**
+   * Whether the person has an active stored grant of the admin role.
+   */
+  isAdmin: boolean
+}
+
 export type ProblemDetails = {
   type?: null | string
   title?: null | string
@@ -94,6 +121,101 @@ export type ProblemDetails = {
   detail?: null | string
   instance?: null | string
 }
+
+export type GetApiAdminPeopleData = {
+  body?: never
+  path?: never
+  query?: {
+    search?: string
+  }
+  url: '/api/admin/people'
+}
+
+export type GetApiAdminPeopleErrors = {
+  /**
+   * Not Found
+   */
+  404: unknown
+}
+
+export type GetApiAdminPeopleResponses = {
+  /**
+   * OK
+   */
+  200: ListPeopleResponse
+}
+
+export type GetApiAdminPeopleResponse = GetApiAdminPeopleResponses[keyof GetApiAdminPeopleResponses]
+
+export type DeleteApiAdminPeopleByPersonIdAdminData = {
+  body?: never
+  path: {
+    personId: string
+  }
+  query?: never
+  url: '/api/admin/people/{personId}/admin'
+}
+
+export type DeleteApiAdminPeopleByPersonIdAdminErrors = {
+  /**
+   * Bad Request
+   */
+  400: ProblemDetails
+  /**
+   * Not Found
+   */
+  404: unknown
+  /**
+   * Conflict
+   */
+  409: ProblemDetails
+}
+
+export type DeleteApiAdminPeopleByPersonIdAdminError =
+  DeleteApiAdminPeopleByPersonIdAdminErrors[keyof DeleteApiAdminPeopleByPersonIdAdminErrors]
+
+export type DeleteApiAdminPeopleByPersonIdAdminResponses = {
+  /**
+   * No Content
+   */
+  204: void
+}
+
+export type DeleteApiAdminPeopleByPersonIdAdminResponse =
+  DeleteApiAdminPeopleByPersonIdAdminResponses[keyof DeleteApiAdminPeopleByPersonIdAdminResponses]
+
+export type PutApiAdminPeopleByPersonIdAdminData = {
+  body?: never
+  path: {
+    personId: string
+  }
+  query?: never
+  url: '/api/admin/people/{personId}/admin'
+}
+
+export type PutApiAdminPeopleByPersonIdAdminErrors = {
+  /**
+   * Not Found
+   */
+  404: unknown
+  /**
+   * Conflict
+   */
+  409: ProblemDetails
+}
+
+export type PutApiAdminPeopleByPersonIdAdminError =
+  PutApiAdminPeopleByPersonIdAdminErrors[keyof PutApiAdminPeopleByPersonIdAdminErrors]
+
+export type PutApiAdminPeopleByPersonIdAdminResponses = {
+  /**
+   * No Content
+   */
+  204: void
+}
+
+export type PutApiAdminPeopleByPersonIdAdminResponse =
+  PutApiAdminPeopleByPersonIdAdminResponses[keyof PutApiAdminPeopleByPersonIdAdminResponses]
 
 export type GetApiAdminStatsData = {
   body?: never

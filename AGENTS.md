@@ -88,7 +88,7 @@ arguments start the host. A command-line tool runs without sign-in, messaging or
 The slots 16030–16032 and 16040 are kept free for a platform mock, Mailpit and a storage emulator, so every BCC app has the same
 layout. `scripts/init-app.ps1 -PortBase <port>` moves the whole range; two apps on one machine need different bases. Personas in the
 OIDC mock: `user` (member, owns the seeded notes), `user2` (second member, for ownership tests), `admin` (admin role, second factor)
-and `admin-no-mfa` (admin role without one: sign-in ends on the second-factor page).
+and `admin-no-mfa` (admin role without one: sign-in ends on the second-factor page). The mock has a second client, `template-entra`, which signs the same personas in as Entra people (own `sub`, `oid`, `tid`, no personUid, no role: `admin` and `admin-no-mfa` are admins through `Auth:BootstrapAdmins`); `/auth/sign-in` picks the provider.
 
 ### Always use `--isolated` in a git worktree and for parallel agents
 
@@ -118,10 +118,11 @@ empty database and serve the built `frontend/dist` instead of Vite.
 
 Each rule says why, and which test or guard enforces it (standard 24.3).
 
-- **Every endpoint requires a signed-in person by default.** The fallback policy requires the BCC `personUid` claim, which keys the user's
-  data, so do not add `[Authorize]`. `[AllowAnonymous]` is allowed only for routes in `AnonymousRouteGuard` (`/auth/login`,
-  `/auth/mfa-required`, `/auth/backchannel-logout`, `/health`, `/alive`); startup fails otherwise (`AssertAnonymousRoutes()`), and
-  `SecurityTests` sweeps every route. `/api/admin/**` requires the admin policy by convention; an empty `Auth:AdminRole` denies everyone.
+- **Every endpoint requires a signed-in person by default.** The fallback policy requires the app's `template:person` claim (a Guid the
+  sign-in sets, never one from a token), which keys the user's data, so do not add `[Authorize]`. `[AllowAnonymous]` is allowed only
+  for routes in `AnonymousRouteGuard` (`/auth/login`, `/auth/login/{provider}`, `/auth/sign-in`, `/auth/mfa-required`,
+  `/auth/backchannel-logout`, `/health`, `/alive`); startup fails otherwise (`AssertAnonymousRoutes()`), and `SecurityTests` sweeps
+  every route. `/api/admin/**` requires the admin policy by convention; an empty `Auth:AdminRole` denies everyone.
   An administrator's session needs a second factor (`amr` has `mfa`; `AdminMfaMiddleware`).
 - **Endpoints follow `LoadAsync` → `Permission` → `Before` → `Validate` → `Post`** (standard 09.2). `Permission` is pure and decides who:
   404 without a body when the note does not exist or is archived, 403 (`Forbidden`, no body) when it exists and the caller may not use it
@@ -132,8 +133,12 @@ Each rule says why, and which test or guard enforces it (standard 24.3).
 - **Each endpoint has its own `sealed record` request and response**; never return a stored type (`Endpoints_return_sealed_records_and_not_stored_types`).
   Endpoint classes are static, and there are no `*Service` or `*Repository` slices (architecture tests). Handlers return side effects
   (storage actions, messages) instead of calling the database, so the decision logic is testable without one.
-- **Authentication is a BFF**: opaque `__Host-` cookie, server-side session store, PKCE, PAR where BCC Signon offers it, no tokens in the
+- **Authentication is a BFF**: opaque `__Host-` cookie, server-side session store, PKCE, PAR where the provider offers it, no tokens in the
   browser ([ADR 0019](docs/adrs/0019-bff-sign-in-with-bcc-signon.md), [0020](docs/adrs/0020-server-side-sessions-with-back-channel-logout.md)).
+  BCC Signon, Microsoft Entra ID or both are on by configuration; with both, `/auth/sign-in` is the chooser. No account linking. The
+  person id for Signon is the `personUid`, for Entra an id the app issues (`person_identities`). Admin comes from `role_grants`
+  (managed under `/api/admin/people`, first admin from `Auth:BootstrapAdmins`) and, for Signon, the token's `role`
+  ([ADR 0031](docs/adrs/0031-entra-id-sign-in-next-to-bcc-signon.md)).
   Logout is a plain form POST to `/auth/logout`, never a GET.
 - **CSRF is the cross-origin check, with no tokens** (`CrossOriginProtection`, ADR 0022): an unsafe request must carry
   `Sec-Fetch-Site: same-origin` or `none`, or an `Origin` of our own, or it answers 403. There is no CORS policy and no rate limiting
@@ -245,13 +250,16 @@ with IAM authentication, behind the platform gateway; only `/assets/*` comes fro
 - `GenerateDocumentationFile` is on, so the `dotnet format` fix for CS1573 (a doc comment that documents some parameters but not all)
   inserts empty `<param>` tags. Write the missing tags instead of keeping the empty ones.
 - The internal message `NoteArchivedMessage` is what leaves the endpoint; the archived note itself is the row with `archived_at` set.
+- Entra has no step-up: an administrator whose Entra ID token has no `mfa` in `amr` gets no session and ends on `/auth/mfa-required`. A
+  session ends on logout, on a revoke under `/api/admin/people` or after 8 hours; Entra has no back-channel logout.
 - `Wolverine.Runtime` has an `IInternalMessage` of its own: a file that uses both needs an alias or a qualified name.
 - Logout must be a real HTML form POST to `/auth/logout`, because the response redirects through the identity provider; `fetch` cannot
   follow it. The cross-origin check covers it, so the form carries no token.
-- Configuration keys are `Oidc:*` (not `OIDC`), `Messaging:UsePubSub`, `Messaging:ProjectId`, `Messaging:Topic`, `BccPubSub:Enabled` and, only
+- Configuration keys are `Oidc:*` (not `OIDC`; BCC Signon), `Entra:TenantId`, `Entra:ClientId`, `Entra:ClientSecret` (`Entra:Authority` only in
+  Development and Test, for the mock), `Auth:AdminRole`, `Auth:BootstrapAdmins` (one string of `<provider>:<id>` entries separated by `,` or `;`: Signon `personUid` or Entra `oid`; real people's ids, so it comes from the Secret Manager secret `<app>-bootstrap-admins`, never from a committed file), `Messaging:UsePubSub`, `Messaging:ProjectId`, `Messaging:Topic`, `BccPubSub:Enabled` and, only
   when that is true, `BccPlatform:*`. `Persistence:Schema` puts the app in a schema of its own (previews).
-- The persona person uids are written once, in `api/OidcMock/Personas.cs`; the seeder, the integration tests and the E2E tests compile that
-  file in as a link. Seeding runs only in the environments `SeedingGate` allows (Development, Test, Sandbox, Preview).
+- The persona person uids are written once, in `api/OidcMock/Personas.cs`; the seeder, the integration tests and the AppHost compile that
+  file in as a link (the E2E tests get it through their AppHost reference). Seeding runs only in the environments `SeedingGate` allows (Development, Test, Sandbox, Preview).
 - `dotnet test` uses the Microsoft.Testing.Platform runner (`global.json`): pass `--project` or `--solution`, not a bare path.
 - A migration or a seeder change needs `node tools/db-snapshot/update.mjs`: a new database starts from the committed snapshot in `api/BccCode.Template.TestData/Snapshots/`, and `DatabaseSnapshotTests` fails when it is older than the newest migration. The seeder must stay deterministic (fixed ids and dates, no clock).
 

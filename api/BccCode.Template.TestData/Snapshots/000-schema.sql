@@ -74,6 +74,37 @@ CREATE TABLE public.note (
 
 
 --
+-- Name: person_identities; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.person_identities (
+    provider character varying(30) NOT NULL,
+    subject character varying(512) NOT NULL,
+    person_id uuid NOT NULL,
+    issuer character varying(512) NOT NULL,
+    display_name character varying(200) NOT NULL,
+    first_sign_in_at timestamp with time zone NOT NULL,
+    last_sign_in_at timestamp with time zone NOT NULL,
+    version integer NOT NULL
+);
+
+
+--
+-- Name: role_grants; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.role_grants (
+    person_id uuid NOT NULL,
+    role character varying(100) NOT NULL,
+    granted_at timestamp with time zone NOT NULL,
+    granted_by uuid,
+    revoked_at timestamp with time zone,
+    revoked_by uuid,
+    version integer NOT NULL
+);
+
+
+--
 -- Name: wolverine_agent_restrictions; Type: TABLE; Schema: public; Owner: -
 --
 

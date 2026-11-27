@@ -12,6 +12,8 @@ public static class AnonymousRouteGuard
     public static readonly IReadOnlyList<string> Allowed =
     [
         "/auth/login",               // starts the sign-in; the return URL is checked as local
+        "/auth/login/{provider}",    // starts the sign-in of one provider; the return URL is checked as local, an unknown provider is 404
+        "/auth/sign-in",             // fixed links to the providers, before any session exists; the return URL is checked as local
         "/auth/mfa-required",        // fixed text: where a step-up without a second factor ends, before any session exists
         "/auth/backchannel-logout",  // the signed logout token is the credential
         "/health",                   // probes: no personal data

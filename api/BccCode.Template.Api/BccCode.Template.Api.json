@@ -5,6 +5,126 @@
     "version": "v1"
   },
   "paths": {
+    "/api/admin/people": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "GET_api_admin_people",
+        "description": "listPeople",
+        "operationId": "ListPeople",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListPeopleResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/admin/people/{personId}/admin": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "PUT_api_admin_people_personId_admin",
+        "description": "grantAdmin",
+        "operationId": "GrantAdmin",
+        "parameters": [
+          {
+            "name": "personId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "DELETE_api_admin_people_personId_admin",
+        "description": "revokeAdmin",
+        "operationId": "RevokeAdmin",
+        "parameters": [
+          {
+            "name": "personId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/stats": {
       "get": {
         "tags": [
@@ -490,6 +610,20 @@
           }
         }
       },
+      "ListPeopleResponse": {
+        "required": [
+          "people"
+        ],
+        "type": "object",
+        "properties": {
+          "people": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PersonItem"
+            }
+          }
+        }
+      },
       "NoteItem": {
         "required": [
           "id",
@@ -522,6 +656,40 @@
           "version": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "PersonItem": {
+        "required": [
+          "personId",
+          "displayName",
+          "provider",
+          "lastSignInAt",
+          "isAdmin"
+        ],
+        "type": "object",
+        "properties": {
+          "personId": {
+            "type": "string",
+            "description": "The app's person id, which the grant and revoke routes take.",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The name from the last sign-in; empty when the token had none."
+          },
+          "provider": {
+            "type": "string",
+            "description": "The provider key of this identity (`bcc-signon` or `entra`)."
+          },
+          "lastSignInAt": {
+            "type": "string",
+            "description": "When this identity last signed in.",
+            "format": "date-time"
+          },
+          "isAdmin": {
+            "type": "boolean",
+            "description": "Whether the person has an active stored grant of the admin role."
           }
         }
       },

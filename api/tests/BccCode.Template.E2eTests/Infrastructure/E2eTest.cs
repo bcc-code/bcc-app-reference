@@ -3,6 +3,16 @@ using OidcMock;
 
 namespace BccCode.Template.E2eTests.Infrastructure;
 
+/// <summary>The identity provider a test signs in with. The app offers both on <c>/auth/sign-in</c> (ADR 0031).</summary>
+public enum SignInProvider
+{
+    /// <summary>BCC Signon (the mock's <c>template</c> client). The default, so the tests that came before Entra keep their meaning.</summary>
+    Signon,
+
+    /// <summary>Microsoft Entra ID (the mock's <c>template-entra</c> client).</summary>
+    Entra,
+}
+
 [Collection(E2eSuite.Name)]
 public abstract class E2eTest(AspireManager aspire) : IAsyncLifetime
 {
@@ -35,10 +45,10 @@ public abstract class E2eTest(AspireManager aspire) : IAsyncLifetime
     }
 
     /// <summary>A new page that is signed in as <paramref name="persona"/> and sits on <paramref name="path"/>.</summary>
-    protected async Task<IPage> NewSignedInPageAsync(Persona persona, string path = "/notes")
+    protected async Task<IPage> NewSignedInPageAsync(Persona persona, string path = "/notes", SignInProvider provider = SignInProvider.Signon)
     {
         var page = await NewPageAsync();
-        await SignInAsync(page, persona, path);
+        await SignInAsync(page, persona, path, provider);
         return page;
     }
 
@@ -47,19 +57,29 @@ public abstract class E2eTest(AspireManager aspire) : IAsyncLifetime
     /// page. The mock has one button per persona. An administrator is stepped up to a second factor by the app; the mock's
     /// persona either has one (amr mfa) or not, so no second page is shown for a persona that has it.
     /// </summary>
-    protected async Task SignInAsync(IPage page, Persona persona, string path = "/notes")
+    protected async Task SignInAsync(IPage page, Persona persona, string path = "/notes", SignInProvider provider = SignInProvider.Signon)
     {
-        await PickPersonaAsync(page, persona, path);
+        await PickPersonaAsync(page, persona, path, provider);
         await page.WaitForURLAsync(url => IsApp(url) && new Uri(url).AbsolutePath == path);
         await Assertions.Expect(page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Level = 1 })).ToBeVisibleAsync();
     }
 
-    /// <summary>Opens <paramref name="path"/> and picks <paramref name="persona"/> on the mock's login page; nothing after that.</summary>
-    protected async Task PickPersonaAsync(IPage page, Persona persona, string path = "/notes")
+    /// <summary>
+    /// Opens <paramref name="path"/>, picks <paramref name="provider"/> on the app's sign-in page and then <paramref name="persona"/>
+    /// on the mock's login page; nothing after that.
+    /// </summary>
+    protected async Task PickPersonaAsync(IPage page, Persona persona, string path = "/notes", SignInProvider provider = SignInProvider.Signon)
     {
         await page.GotoAsync(path);
+        await page.WaitForURLAsync(url => IsApp(url) && new Uri(url).AbsolutePath == "/auth/sign-in");
+        await page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = ProviderLinkName(provider) }).ClickAsync();
         await page.WaitForURLAsync(url => url.StartsWith(aspire.OidcBase.ToString(), StringComparison.Ordinal));
         await page.Locator($"button[name=\"persona\"][value=\"{persona.Key}\"]").ClickAsync();
+    }
+
+    protected static string ProviderLinkName(SignInProvider provider)
+    {
+        return provider == SignInProvider.Entra ? "Sign in with Microsoft" : "Sign in with BCC Signon";
     }
 
     protected bool IsApp(string url)

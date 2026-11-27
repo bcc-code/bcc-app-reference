@@ -3,6 +3,12 @@
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client'
 import { client } from './client.gen'
 import type {
+  DeleteApiAdminPeopleByPersonIdAdminData,
+  DeleteApiAdminPeopleByPersonIdAdminErrors,
+  DeleteApiAdminPeopleByPersonIdAdminResponses,
+  GetApiAdminPeopleData,
+  GetApiAdminPeopleErrors,
+  GetApiAdminPeopleResponses,
   GetApiAdminStatsData,
   GetApiAdminStatsErrors,
   GetApiAdminStatsResponses,
@@ -24,6 +30,9 @@ import type {
   PostApiNotesData,
   PostApiNotesErrors,
   PostApiNotesResponses,
+  PutApiAdminPeopleByPersonIdAdminData,
+  PutApiAdminPeopleByPersonIdAdminErrors,
+  PutApiAdminPeopleByPersonIdAdminResponses,
 } from './types.gen'
 
 export type Options<
@@ -45,6 +54,50 @@ export type Options<
 }
 
 export class AdminClient {
+  /**
+   * GET_api_admin_people
+   *
+   * listPeople
+   */
+  public static listPeople<ThrowOnError extends boolean = true>(
+    options?: Options<GetApiAdminPeopleData, ThrowOnError>,
+  ): RequestResult<GetApiAdminPeopleResponses, GetApiAdminPeopleErrors, ThrowOnError> {
+    return (options?.client ?? client).get<GetApiAdminPeopleResponses, GetApiAdminPeopleErrors, ThrowOnError>({
+      url: '/api/admin/people',
+      ...options,
+    })
+  }
+
+  /**
+   * DELETE_api_admin_people_personId_admin
+   *
+   * revokeAdmin
+   */
+  public static revokeAdmin<ThrowOnError extends boolean = true>(
+    options: Options<DeleteApiAdminPeopleByPersonIdAdminData, ThrowOnError>,
+  ): RequestResult<DeleteApiAdminPeopleByPersonIdAdminResponses, DeleteApiAdminPeopleByPersonIdAdminErrors, ThrowOnError> {
+    return (options.client ?? client).delete<
+      DeleteApiAdminPeopleByPersonIdAdminResponses,
+      DeleteApiAdminPeopleByPersonIdAdminErrors,
+      ThrowOnError
+    >({ url: '/api/admin/people/{personId}/admin', ...options })
+  }
+
+  /**
+   * PUT_api_admin_people_personId_admin
+   *
+   * grantAdmin
+   */
+  public static grantAdmin<ThrowOnError extends boolean = true>(
+    options: Options<PutApiAdminPeopleByPersonIdAdminData, ThrowOnError>,
+  ): RequestResult<PutApiAdminPeopleByPersonIdAdminResponses, PutApiAdminPeopleByPersonIdAdminErrors, ThrowOnError> {
+    return (options.client ?? client).put<
+      PutApiAdminPeopleByPersonIdAdminResponses,
+      PutApiAdminPeopleByPersonIdAdminErrors,
+      ThrowOnError
+    >({ url: '/api/admin/people/{personId}/admin', ...options })
+  }
+
   /**
    * GET_api_admin_stats
    *

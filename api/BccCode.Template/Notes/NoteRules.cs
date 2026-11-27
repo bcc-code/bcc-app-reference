@@ -10,7 +10,7 @@ public static class NoteRules
     /// <summary>A note belongs to the person who created it, and nobody else may read or change it.</summary>
     public static bool CanUse(Note note, CallerAccess access)
     {
-        return note.OwnerId == access.PersonUid;
+        return note.OwnerId == access.PersonId;
     }
 
     /// <summary>

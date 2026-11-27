@@ -53,6 +53,22 @@ ALTER TABLE ONLY public.note
 
 
 --
+-- Name: person_identities pk_person_identities; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.person_identities
+    ADD CONSTRAINT pk_person_identities PRIMARY KEY (provider, subject);
+
+
+--
+-- Name: role_grants pk_role_grants; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.role_grants
+    ADD CONSTRAINT pk_role_grants PRIMARY KEY (person_id, role);
+
+
+--
 -- Name: wolverine_agent_restrictions pkey_wolverine_agent_restrictions_id; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -235,6 +251,13 @@ CREATE INDEX ix_auth_sessions_issuer_subject ON public.auth_sessions USING btree
 --
 
 CREATE INDEX ix_note_owner_id_created_at ON public.note USING btree (owner_id, created_at) WHERE (archived_at IS NULL);
+
+
+--
+-- Name: ix_person_identities_person_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_person_identities_person_id ON public.person_identities USING btree (person_id);
 
 
 --

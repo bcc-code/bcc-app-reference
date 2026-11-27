@@ -15,6 +15,12 @@ public static class OidcEndpoints
     /// <summary>The BCC Signon claim the app keys its data by.</summary>
     public const string PersonUidClaim = "https://login.bcc.no/claims/personUid";
 
+    public const string EntraObjectIdClaim = "oid";
+    public const string EntraTenantIdClaim = "tid";
+
+    /// <summary>Which persona signed in; in the mock's session cookie only, so the same session serves both clients.</summary>
+    private const string PERSONA_CLAIM = "persona";
+
     public static void MapOidcEndpoints(this WebApplication app)
     {
         app.MapMethods("/connect/authorize", ["GET", "POST"], (Delegate)AuthorizeAsync);
@@ -38,11 +44,34 @@ public static class OidcEndpoints
         }
 
         var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme, Claims.Name, Claims.Role);
-        foreach (var claim in session.Principal!.Claims)
+        foreach (var claim in TokenClaims(request.ClientId, session.Principal!))
             identity.AddClaim(claim.SetDestinations(Destinations.AccessToken, Destinations.IdentityToken));
         var principal = new ClaimsPrincipal(identity);
         principal.SetScopes(request.GetScopes());
         return Results.SignIn(principal, properties: null, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+    }
+
+    /// <summary>
+    /// The claims of the token for a client. The Entra client gets what an Entra v2 token has for the persona: its own <c>sub</c>, <c>oid</c>,
+    /// <c>tid</c>, <c>name</c>, <c>sid</c> and <c>amr</c>, and no person uid and no role. Any other client gets the BCC Signon claims.
+    /// The persona key in the session cookie is the mock's own and goes into no token.
+    /// </summary>
+    internal static IEnumerable<Claim> TokenClaims(string? clientId, ClaimsPrincipal session)
+    {
+        var signon = session.Claims.Where(c => c.Type != PERSONA_CLAIM).ToList();
+        if (clientId != Persona.EntraClientId || Persona.Find(session.FindFirst(PERSONA_CLAIM)?.Value) is not { } person) return signon;
+
+        var claims = new List<Claim>
+        {
+            new(Claims.Subject, person.EntraSubject),
+            new(EntraObjectIdClaim, person.EntraObjectId),
+            new(EntraTenantIdClaim, Persona.EntraTenantId),
+            new(Claims.Name, person.Name),
+            new("sid", signon.First(c => c.Type == "sid").Value),
+            new(Claims.AuthenticationMethodReference, "pwd"),
+        };
+        if (person.Mfa) claims.Add(new Claim(Claims.AuthenticationMethodReference, "mfa"));
+        return claims;
     }
 
     // The authorization code carries the principal; the token endpoint only turns it into tokens.
@@ -90,6 +119,7 @@ public static class OidcEndpoints
             new(Claims.Subject, person.PersonUid),
             new(Claims.Name, person.Name),
             new(PersonUidClaim, person.PersonUid),
+            new(PERSONA_CLAIM, person.Key),
             new("sid", Guid.NewGuid().ToString("N")),
             new(Claims.AuthenticationMethodReference, "pwd"),
         };
